@@ -17,6 +17,7 @@ npm run check
 ## Packages
 
 - [`pi-usage`](./packages/pi-usage) — GitHub Copilot plan and quota usage.
+  [![npm version](https://img.shields.io/npm/v/@marcosgilf/pi-usage)](https://www.npmjs.com/package/@marcosgilf/pi-usage) · [changelog](./packages/pi-usage/CHANGELOG.md) · [GitHub releases](https://github.com/marcosgilf/pi-packages/releases)
 
 ## Add a package
 
@@ -26,7 +27,7 @@ package versions independent; use `npm run changeset` for published behavior cha
 
 ## CI and releases
 
-GitHub Actions runs `npm run check` and `npm test` on pull requests to `main` and before release processing. A push to `main` runs Changesets: it creates a version pull request when changesets are pending, then publishes packages after that pull request is merged. Configure the repository's `NPM_TOKEN` secret and allow `GITHUB_TOKEN` to create pull requests before the first release.
+GitHub Actions runs `npm run check` and `npm test` on pull requests to `main` and before release processing. Changesets creates a version pull request for pending changesets. Merging it publishes packages and creates package-specific GitHub tags and releases from their changelogs. The npm version badge and GitHub releases link update as packages ship. Configure the repository's `NPM_TOKEN` secret and allow `GITHUB_TOKEN` to create pull requests.
 
 ## License
 
