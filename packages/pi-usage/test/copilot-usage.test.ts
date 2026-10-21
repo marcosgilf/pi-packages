@@ -3,8 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  formatContextUsageIndicator,
   formatPlanUsage,
   formatProgressBar,
+  formatSessionUsageSummary,
   formatTokens,
   formatUsageSummary,
   getUsageProgress,
@@ -90,6 +92,30 @@ describe("Copilot usage", () => {
       "Plan: Copilot Enterprise",
       "premium requests: unlimited",
       "Resets monthly",
+    ]);
+  });
+
+  it("keeps the footer context colors at Pi's usage thresholds", () => {
+    expect(formatContextUsageIndicator(70, 1_000_000)).toEqual({ text: "70.0%/1.0M", style: "text" });
+    expect(formatContextUsageIndicator(75.7, 1_000_000)).toEqual({ text: "75.7%/1.0M", style: "warning" });
+    expect(formatContextUsageIndicator(90, 1_000_000)).toEqual({ text: "90.0%/1.0M", style: "warning" });
+    expect(formatContextUsageIndicator(90.1, 1_000_000)).toEqual({ text: "90.1%/1.0M", style: "error" });
+    expect(formatContextUsageIndicator(null, 1_000_000)).toEqual({ text: "?/1.0M", style: "dim" });
+  });
+
+  it("formats footer token, cache, cost, and context details for the modal", () => {
+    expect(
+      formatSessionUsageSummary(
+        { input: 1000, output: 300, cacheRead: 600, cacheWrite: 200, cost: 0.04 },
+        { percent: 75.7, tokens: 757_000, contextWindow: 1_000_000 },
+      ),
+    ).toEqual([
+      "Session usage",
+      "Tokens ↑1.8K (600 cached)",
+      "Tokens ↓300",
+      "Cache write: 200",
+      "Cost: $0.040",
+      "Context: 75.7% · 757.0K / 1.0M",
     ]);
   });
 

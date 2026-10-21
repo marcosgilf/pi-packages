@@ -1,23 +1,22 @@
 import { execFile } from "node:child_process";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type TuiMouseEvent, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   type CopilotUsage,
+  formatContextUsageIndicator,
   formatPlanUsage,
-  formatProgressBar,
-  formatTokens,
+  formatSessionUsageSummary,
   formatUsageSummary,
   getUsageProgress,
   parseCopilotUsage,
   summarizeSession,
-  writeClipboard,
 } from "./core.ts";
+import { type ModalContent, type ModalRow, showModal } from "./modal.ts";
 
 const CACHE_MS = 5 * 60 * 1000;
 const FOOTER_STATUS_KEY = "copilot-usage";
 
 type UsageSnapshot = CopilotUsage & { fetchedAt: number };
-type FooterRow = { text: string; style?: "accent" | "success" | "warning"; progress?: number };
 
 let cachedUsage: UsageSnapshot | undefined;
 let lastError: string | undefined;
@@ -93,15 +92,8 @@ function addCustomFooter(ctx: ExtensionContext): void {
     };
     const unsubscribe = footerData.onBranchChange(requestRender);
     requestFooterRender = requestRender;
-    let statsCache: { leafId: string | null; stats: ReturnType<typeof summarizeSession> } | undefined;
     let usageClickBounds: { left: number; right: number } | undefined;
-    const getStats = () => {
-      const leafId = ctx.sessionManager.getLeafId();
-      if (statsCache?.leafId === leafId) return statsCache.stats;
-      const stats = summarizeSession(ctx.sessionManager.getEntries());
-      statsCache = { leafId, stats };
-      return stats;
-    };
+    let contextClickBounds: { left: number; right: number } | undefined;
 
     return {
       dispose() {
@@ -110,35 +102,27 @@ function addCustomFooter(ctx: ExtensionContext): void {
         if (requestFooterRender === requestRender) requestFooterRender = undefined;
       },
       handleMouse(event: TuiMouseEvent) {
-        if (
-          event.button !== "left" ||
-          event.y !== 1 ||
-          !usageClickBounds ||
-          event.x < usageClickBounds.left ||
-          event.x >= usageClickBounds.right
-        )
-          return;
-        if (event.type === "click") void showUsage(ctx);
+        if (event.button !== "left" || event.y !== 1) return;
+        const clickedUsage =
+          usageClickBounds !== undefined && event.x >= usageClickBounds.left && event.x < usageClickBounds.right;
+        const clickedContext =
+          contextClickBounds !== undefined && event.x >= contextClickBounds.left && event.x < contextClickBounds.right;
+        if (!clickedUsage && !clickedContext) return;
+        if (event.type === "click") {
+          if (clickedContext) void showSessionUsage(ctx);
+          else void showCopilotUsage(ctx);
+        }
         if (event.type === "press" || event.type === "release" || event.type === "click") {
           return { handled: true, render: event.type === "click" };
         }
       },
       invalidate() {},
       render(width: number) {
-        const stats = getStats();
         const context = ctx.getContextUsage();
-        const leftParts: string[] = [];
-        const input = stats.input + stats.cacheRead + stats.cacheWrite;
-        if (input) leftParts.push(`↑${formatTokens(input)}`);
-        if (stats.output) leftParts.push(`↓${formatTokens(stats.output)}`);
-        if (stats.cacheRead) leftParts.push(`R${formatTokens(stats.cacheRead)}`);
-        if (stats.cacheWrite) leftParts.push(`W${formatTokens(stats.cacheWrite)}`);
-        if (stats.cost) leftParts.push(`$${stats.cost.toFixed(3)}`);
-        if (context) {
-          const percent = context.percent === null ? "?" : `${context.percent.toFixed(1)}%`;
-          leftParts.push(`${percent}/${formatTokens(context.contextWindow)}`);
-        }
-        let left = theme.fg("dim", leftParts.join(" "));
+        const contextIndicator = context
+          ? formatContextUsageIndicator(context.percent, context.contextWindow)
+          : undefined;
+        let left = contextIndicator ? theme.fg(contextIndicator.style, contextIndicator.text) : "";
 
         const model = ctx.model;
         const modelName = model?.name || model?.id || "no-model";
@@ -163,7 +147,10 @@ function addCustomFooter(ctx: ExtensionContext): void {
             : undefined;
         const leftWidth = Math.max(0, width - clippedRightWidth - 2);
         left = leftWidth > 0 ? truncateToWidth(left, leftWidth, "...") : "";
-        const padding = " ".repeat(Math.max(0, width - visibleWidth(left) - clippedRightWidth));
+        const visibleLeftWidth = visibleWidth(left);
+        contextClickBounds =
+          contextIndicator && visibleLeftWidth > 0 ? { left: 0, right: visibleLeftWidth } : undefined;
+        const padding = " ".repeat(Math.max(0, width - visibleLeftWidth - clippedRightWidth));
         const statsLine = `${left}${padding}${clippedRight}`;
 
         const home = process.env.HOME || "";
@@ -184,48 +171,10 @@ function addCustomFooter(ctx: ExtensionContext): void {
   });
 }
 
-function copyToClipboard(text: string): Promise<void> {
-  if (process.platform !== "darwin") return Promise.reject(new Error("Clipboard copy requires macOS."));
-  return writeClipboard(text);
-}
-
-function borderedRows(rows: FooterRow[], width: number, theme: Theme): string[] {
-  if (width < 6)
-    return rows.map(({ text, progress }) =>
-      truncateToWidth(progress === undefined ? text : formatProgressBar(progress, width), width, "…"),
-    );
-  const contentWidth = width - 4;
-  const edge = theme.fg("muted", "│");
-  const top = theme.fg("muted", `╭${"─".repeat(contentWidth + 2)}╮`);
-  const bottom = theme.fg("muted", `╰${"─".repeat(contentWidth + 2)}╯`);
-  const content = rows.map(({ text, style, progress }) => {
-    const value = progress === undefined ? text : formatProgressBar(progress, contentWidth);
-    const styled = style === "accent" ? theme.fg(style, theme.bold(value)) : style ? theme.fg(style, value) : value;
-    const clipped = truncateToWidth(styled, contentWidth, "…");
-    const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(clipped)));
-    return `${edge}${theme.bg("selectedBg", ` ${clipped}${padding} `)}${edge}`;
-  });
-  return [top, ...content, bottom];
-}
-
-function modalOverlayRows(rows: FooterRow[], width: number, height: number, theme: Theme): string[] {
-  const panelWidth = Math.min(width, 74);
-  const panel = borderedRows(rows, panelWidth, theme);
-  const left = Math.floor((width - panelWidth) / 2);
-  const top = Math.max(0, Math.floor((height - panel.length) / 2));
-  const screen = Array.from({ length: height }, () => " ".repeat(width));
-  panel.forEach((line, index) => {
-    const row = top + index;
-    if (row < height)
-      screen[row] = `${" ".repeat(left)}${line}${" ".repeat(Math.max(0, width - left - visibleWidth(line)))}`;
-  });
-  return screen;
-}
-
-function buildUsageModal(usage: CopilotUsage): { rows: FooterRow[]; clipboardText: string } {
+function buildCopilotUsageModal(usage: CopilotUsage): ModalContent {
   const [title, planText, quotaText, resetText] = formatUsageSummary(usage);
   const progress = getUsageProgress(usage);
-  const rows: FooterRow[] = [
+  const rows: ModalRow[] = [
     { text: title, style: "accent" },
     { text: "" },
     { text: planText },
@@ -234,66 +183,52 @@ function buildUsageModal(usage: CopilotUsage): { rows: FooterRow[]; clipboardTex
   ];
   if (progress === undefined) rows.push({ text: "" });
   else rows.push({ text: "" }, { text: "", progress, style: progress >= 90 ? "warning" : "success" }, { text: "" });
-  rows.push({ text: resetText }, { text: "" }, { text: "r refreshes · c copies plain text · Esc/Enter closes" });
+  rows.push({ text: resetText });
   return { rows, clipboardText: [title, planText, quotaText, resetText].join("\n") };
 }
 
-async function showUsage(ctx: ExtensionContext): Promise<void> {
+function buildSessionUsageModal(ctx: ExtensionContext): ModalContent {
+  const stats = summarizeSession(ctx.sessionManager.getEntries());
+  const summary = formatSessionUsageSummary(stats, ctx.getContextUsage());
+  const rows: ModalRow[] = [
+    { text: summary[0], style: "accent" },
+    { text: "" },
+    ...summary.slice(1, -1).map((text) => ({ text })),
+    { text: "" },
+    { text: summary[summary.length - 1] },
+  ];
+  return { rows, clipboardText: summary.join("\n") };
+}
+
+async function showCopilotUsage(ctx: ExtensionContext): Promise<void> {
   if (ctx.mode !== "tui") {
     ctx.ui.notify("/copilot-usage requires Pi TUI mode.", "warning");
     return;
   }
-
   try {
-    let content = buildUsageModal(await refreshUsage(true));
-    await ctx.ui.custom(
-      (tui, theme, keybindings, done) => ({
-        render(width: number) {
-          // Mask transcript rows beneath overlay; TUI selection copies rendered screen cells.
-          return modalOverlayRows(content.rows, width, tui.terminal.rows, theme);
-        },
-        invalidate() {},
-        handleInput(data: string) {
-          if (keybindings.matches(data, "app.interrupt") || keybindings.matches(data, "tui.input.submit")) {
-            done(undefined);
-            return;
-          }
-          const key = data.toLowerCase();
-          if (key === "r") {
-            content.rows[content.rows.length - 1] = { text: "Refreshing usage…" };
-            tui.requestRender();
-            void refreshUsage(true)
-              .then((usage) => {
-                content = buildUsageModal(usage);
-                tui.requestRender();
-              })
-              .catch((error: unknown) => {
-                const message = error instanceof Error ? error.message : String(error);
-                content.rows[content.rows.length - 1] = { text: `Refresh failed: ${message}`, style: "warning" };
-                tui.requestRender();
-              });
-            return;
-          }
-          if (key === "c") {
-            void copyToClipboard(content.clipboardText)
-              .then(() => {
-                content.rows[content.rows.length - 1] = { text: "Copied plain text", style: "success" };
-                tui.requestRender();
-              })
-              .catch((error: unknown) => {
-                const message = error instanceof Error ? error.message : String(error);
-                content.rows[content.rows.length - 1] = { text: `Copy failed: ${message}`, style: "warning" };
-                tui.requestRender();
-              });
-            return;
-          }
-          tui.requestRender();
-        },
-      }),
-      {
-        overlay: true,
-        overlayOptions: { anchor: "top-left", width: "100%", maxHeight: "100%", margin: 0 },
-      },
+    const content = buildCopilotUsageModal(await refreshUsage(true));
+    await showModal(
+      ctx,
+      content,
+      { refresh: async () => buildCopilotUsageModal(await refreshUsage(true)) },
+      "/copilot-usage requires Pi TUI mode.",
+    );
+  } catch (error) {
+    ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+  }
+}
+
+async function showSessionUsage(ctx: ExtensionContext): Promise<void> {
+  if (ctx.mode !== "tui") {
+    ctx.ui.notify("/session-usage requires Pi TUI mode.", "warning");
+    return;
+  }
+  try {
+    await showModal(
+      ctx,
+      buildSessionUsageModal(ctx),
+      { refresh: async () => buildSessionUsageModal(ctx) },
+      "/session-usage requires Pi TUI mode.",
     );
   } catch (error) {
     ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -322,11 +257,16 @@ export default function (pi: ExtensionAPI): void {
 
   pi.registerCommand("copilot-usage", {
     description: "Show GitHub Copilot plan and quota usage",
-    handler: (_args, ctx) => showUsage(ctx),
+    handler: (_args, ctx) => showCopilotUsage(ctx),
+  });
+
+  pi.registerCommand("session-usage", {
+    description: "Show session token, cost, and context usage",
+    handler: (_args, ctx) => showSessionUsage(ctx),
   });
 
   pi.registerShortcut("super+shift+u", {
     description: "Show GitHub Copilot AI-credit usage",
-    handler: (ctx) => showUsage(ctx),
+    handler: (ctx) => showCopilotUsage(ctx),
   });
 }

@@ -114,6 +114,39 @@ export function formatTokens(tokens: number): string {
   return Math.round(tokens).toLocaleString("en-US");
 }
 
+export type ContextUsageStyle = "error" | "warning" | "text" | "dim";
+
+export function formatContextUsageIndicator(
+  percent: number | null,
+  contextWindow: number,
+): {
+  text: string;
+  style: ContextUsageStyle;
+} {
+  const label = percent === null ? "?" : `${percent.toFixed(1)}%`;
+  const style = percent === null ? "dim" : percent > 90 ? "error" : percent > 70 ? "warning" : "text";
+  return { text: `${label}/${formatTokens(contextWindow)}`, style };
+}
+
+export function formatSessionUsageSummary(
+  stats: SessionUsage,
+  context?: { percent: number | null; tokens: number | null; contextWindow: number },
+): string[] {
+  const lines = ["Session usage"];
+  const promptTokens = stats.input + stats.cacheRead + stats.cacheWrite;
+  if (promptTokens > 0) lines.push(`Tokens ↑${formatTokens(promptTokens)} (${formatTokens(stats.cacheRead)} cached)`);
+  if (stats.output > 0) lines.push(`Tokens ↓${formatTokens(stats.output)}`);
+  if (stats.cacheWrite > 0) lines.push(`Cache write: ${formatTokens(stats.cacheWrite)}`);
+  if (stats.cost > 0) lines.push(`Cost: $${stats.cost.toFixed(3)}`);
+  if (lines.length === 1) lines.push("No token usage in this session");
+  lines.push(
+    context
+      ? `Context: ${context.percent === null ? "?" : `${context.percent.toFixed(1)}%`} · ${context.tokens === null ? "?" : formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}`
+      : "Context: unavailable",
+  );
+  return lines;
+}
+
 export function formatPlanUsage(usage?: CopilotUsage): string {
   if (!usage) return "";
   return usage.unlimited ? `${usage.plan} ∞` : `${usage.plan} ${usage.percentUsed ?? 0}%`;
