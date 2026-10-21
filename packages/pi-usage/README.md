@@ -6,9 +6,10 @@ Show GitHub Copilot plan and quota usage in Pi.
 
 ## ✨ Features
 
-- Show Copilot plan and usage beside Pi's model in the footer.
-- Open a quota modal by clicking the footer usage in fullscreen mode, running `/copilot-usage`, or pressing `super+shift+u`.
-- Refresh modal data with `r` and copy a plain-text summary with `c`.
+- Keep only context percentage/window and Copilot plan usage in the footer; color context use at Pi's warning thresholds.
+- Open Copilot quota details by clicking plan usage, running `/copilot-usage`, or pressing `super+shift+u`.
+- Open session token, cache, cost, and context details by clicking the context indicator or running `/session-usage`.
+- Reuse one modal shell for refresh (`r`) and plain-text copy (`c`).
 - Hide the progress bar for unlimited plans.
 
 ## 📦 Install
@@ -31,13 +32,15 @@ Install `gh`, sign in to GitHub, and grant the `user` OAuth scope if needed:
 gh auth refresh -h github.com -s user
 ```
 
-Start Pi. The footer shows the plan and quota percentage. Run `/copilot-usage` for the modal.
+Start Pi. The footer shows context use and Copilot plan/quota percentage. Run `/copilot-usage` for quota details or `/session-usage` for session totals.
 
 ## 💬 Commands
 
-- `/copilot-usage` opens the modal and refreshes account quota.
-- `super+shift+u` opens the same modal.
-- In the modal, `r` refreshes data and `c` copies plain text. Esc or Enter closes it.
+- `/copilot-usage` opens Copilot plan/quota details and refreshes account quota.
+- `super+shift+u` opens the Copilot modal.
+- `/session-usage` opens session token, cache, cost, and context details.
+- Clicking the context percentage opens session details in Pi fullscreen mode.
+- In either modal, `r` refreshes data and `c` copies plain text. Esc or Enter closes it.
 
 The quota request uses GitHub's undocumented `copilot_internal/user` endpoint through `gh`. GitHub may change this endpoint.
 
@@ -50,8 +53,9 @@ The quota request uses GitHub's undocumented `copilot_internal/user` endpoint th
 ## 🗂️ Package layout
 
 - `src/index.ts` is the Pi extension entrypoint.
-- `src/copilot-usage.ts` registers commands, footer, and modal behavior.
-- `src/core.ts` parses and formats Copilot quota and session data.
+- `src/copilot-usage.ts` registers commands and the footer.
+- `src/modal.ts` provides the shared modal shell and keyboard actions.
+- `src/core.ts` parses and formats Copilot quota, context, and session data.
 - `test/` contains Vitest tests.
 
 ## 🔎 Keywords
