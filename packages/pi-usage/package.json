@@ -1,6 +1,6 @@
 {
   "name": "@marcosgilf/pi-usage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Show GitHub Copilot plan and quota usage in Pi.",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,7 @@
     ]
   },
   "dependencies": {
-    "@marcosgilf/pi-modal": "^0.0.0"
+    "@marcosgilf/pi-modal": "^0.1.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
