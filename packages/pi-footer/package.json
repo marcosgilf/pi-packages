@@ -19,14 +19,12 @@
   ],
   "pi": {
     "extensions": [
-      "./node_modules/@marcosgilf/pi-session/src/index.ts",
-      "./node_modules/@marcosgilf/pi-usage/src/index.ts",
       "./src/index.ts"
     ]
   },
   "dependencies": {
     "@marcosgilf/pi-session": "^0.1.0",
-    "@marcosgilf/pi-usage": "^0.1.0 || ^0.2.0"
+    "@marcosgilf/pi-usage": "^0.2.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

@@ -12,8 +12,6 @@
   ],
   "pi": {
     "extensions": [
-      "./packages/pi-session/src/index.ts",
-      "./packages/pi-usage/src/index.ts",
       "./packages/pi-footer/src/index.ts"
     ]
   },

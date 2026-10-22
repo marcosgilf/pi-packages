@@ -11,17 +11,30 @@ describe("pi-footer", () => {
     const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => void>();
     const emit = vi.fn();
     const setFooter = vi.fn();
+    const registerCommand = vi.fn();
+    const registerShortcut = vi.fn();
     const pi = {
       on: (event: string, handler: (event: unknown, ctx: ExtensionContext) => void) => {
         handlers.set(event, handler);
         return vi.fn();
       },
       events: { emit, on: vi.fn(() => vi.fn()) },
-      registerCommand: vi.fn(),
-      registerShortcut: vi.fn(),
+      registerCommand,
+      registerShortcut,
     } as unknown as ExtensionAPI;
 
     extension(pi);
+
+    expect(registerCommand).toHaveBeenCalledWith(
+      "session-usage",
+      expect.objectContaining({ description: "Show session token, cost, and context usage" }),
+    );
+    expect(registerCommand).toHaveBeenCalledWith(
+      "copilot-usage",
+      expect.objectContaining({ description: "Show GitHub Copilot plan and quota usage" }),
+    );
+    expect(registerShortcut).toHaveBeenCalledWith("super+shift+s", expect.any(Object));
+    expect(registerShortcut).toHaveBeenCalledWith("super+shift+u", expect.any(Object));
 
     const ctx = {
       mode: "tui",
