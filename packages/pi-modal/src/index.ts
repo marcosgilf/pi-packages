@@ -1,12 +1,14 @@
+import { execFile } from "node:child_process";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   type KeybindingsManager,
+  matchesKey,
   type TUI,
+  type TuiMouseEvent,
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import { formatProgressBar, writeClipboard } from "./core.ts";
 
 export type ModalRow = { text: string; style?: "accent" | "success" | "warning"; progress?: number };
 export type ModalContent = { rows: ModalRow[]; clipboardText: string };
@@ -14,6 +16,21 @@ export type ModalActions = {
   refresh: () => Promise<ModalContent>;
   copy?: (text: string) => Promise<void>;
 };
+
+export function writeClipboard(text: string, command = "pbcopy"): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(command, (error) => (error ? reject(error) : resolve()));
+    child.stdin?.on("error", reject);
+    child.stdin?.end(text);
+  });
+}
+
+export function formatProgressBar(percent: number, width: number): string {
+  const cells = Math.max(0, Math.floor(width));
+  const value = Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
+  const filled = Math.round((value / 100) * cells);
+  return `${"█".repeat(filled)}${"░".repeat(cells - filled)}`;
+}
 
 function borderedRows(rows: ModalRow[], width: number, theme: Theme): string[] {
   if (width < 6) {
@@ -35,9 +52,14 @@ function borderedRows(rows: ModalRow[], width: number, theme: Theme): string[] {
   return [top, ...content, bottom];
 }
 
-function modalScreen(rows: ModalRow[], width: number, height: number, theme: Theme): string[] {
+function modalScreen(
+  rows: ModalRow[],
+  width: number,
+  height: number,
+  theme: Theme,
+): { lines: string[]; bounds: { left: number; top: number; right: number; bottom: number } } {
   const panelWidth = Math.min(width, 74);
-  const panel = borderedRows(rows, panelWidth, theme);
+  const panel = borderedRows([{ text: "" }, ...rows, { text: "" }], panelWidth, theme);
   const left = Math.floor((width - panelWidth) / 2);
   const top = Math.max(0, Math.floor((height - panel.length) / 2));
   const screen = Array.from({ length: height }, () => " ".repeat(width));
@@ -47,7 +69,10 @@ function modalScreen(rows: ModalRow[], width: number, height: number, theme: The
       screen[row] = `${" ".repeat(left)}${line}${" ".repeat(Math.max(0, width - left - visibleWidth(line)))}`;
     }
   });
-  return screen;
+  return {
+    lines: screen,
+    bounds: { left, top, right: left + panelWidth, bottom: Math.min(height, top + panel.length) },
+  };
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -67,6 +92,11 @@ export function createModalComponent(
   let status: ModalRow | undefined;
   let disposed = false;
   let refreshGeneration = 0;
+  let bounds: { left: number; top: number; right: number; bottom: number } | undefined;
+  const selectionTui = tui as TUI & {
+    hasActiveSelection?: () => boolean;
+    copyActiveSelectionToClipboard?: () => Promise<boolean>;
+  };
   const requestRender = () => {
     if (!disposed) tui.requestRender();
   };
@@ -77,10 +107,19 @@ export function createModalComponent(
       refreshGeneration++;
     },
     render(width: number) {
-      const hint = status ?? { text: "r refreshes · c copies plain text · Esc/Enter closes" };
-      return modalScreen([...content.rows, { text: "" }, hint], width, tui.terminal.rows, theme);
+      const hint = status ?? { text: "r refresh · c copy full summary · Esc/outside closes" };
+      const layout = modalScreen([...content.rows, { text: "" }, hint], width, tui.terminal.rows, theme);
+      bounds = layout.bounds;
+      return layout.lines;
     },
     invalidate() {},
+    handleMouse(event: TuiMouseEvent) {
+      const inside =
+        bounds && event.x >= bounds.left && event.x < bounds.right && event.y >= bounds.top && event.y < bounds.bottom;
+      if (event.type !== "click" || inside) return;
+      done();
+      return { handled: true, render: true };
+    },
     handleInput(data: string) {
       if (keybindings.matches(data, "app.interrupt") || keybindings.matches(data, "tui.input.submit")) {
         done();
@@ -107,7 +146,28 @@ export function createModalComponent(
           });
         return;
       }
-      if (key === "c") {
+      const copySelection = matchesKey(data, "super+c") || keybindings.matches(data, "tui.input.copy");
+      if (key === "c" || copySelection) {
+        if (copySelection && selectionTui.hasActiveSelection?.() && selectionTui.copyActiveSelectionToClipboard) {
+          status = { text: "Copying selection…" };
+          requestRender();
+          void selectionTui
+            .copyActiveSelectionToClipboard()
+            .then((copied) => {
+              if (disposed) return;
+              status = copied
+                ? { text: "Copied selection", style: "success" }
+                : { text: "Copy failed", style: "warning" };
+              requestRender();
+            })
+            .catch((error: unknown) => {
+              if (disposed) return;
+              const message = error instanceof Error ? error.message : String(error);
+              status = { text: `Copy failed: ${message}`, style: "warning" };
+              requestRender();
+            });
+          return;
+        }
         void (actions.copy ?? copyToClipboard)(content.clipboardText)
           .then(() => {
             if (disposed) return;
