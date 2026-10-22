@@ -87,7 +87,7 @@ function buildCopilotUsageModal(usage: CopilotUsage): ModalContent {
   return { rows, clipboardText: [title, planText, quotaText, resetText].join("\n") };
 }
 
-async function showCopilotUsage(ctx: ExtensionContext): Promise<void> {
+async function showCopilotUsage(ctx: ExtensionContext, isCurrent: () => boolean): Promise<void> {
   const unavailableMessage = "/copilot-usage requires Pi TUI mode.";
   if (ctx.mode !== "tui") {
     ctx.ui.notify(unavailableMessage, "warning");
@@ -95,14 +95,17 @@ async function showCopilotUsage(ctx: ExtensionContext): Promise<void> {
   }
 
   try {
-    const content = buildCopilotUsageModal(await refreshUsage(true));
-    ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(cachedUsage));
+    const usage = await refreshUsage(true);
+    if (!isCurrent()) return;
+    const content = buildCopilotUsageModal(usage);
+    ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage));
     await showModal(
       ctx,
       content,
       {
         refresh: async () => {
           const usage = await refreshUsage(true);
+          if (!isCurrent()) throw new Error("Session ended during usage refresh.");
           ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage));
           return buildCopilotUsageModal(usage);
         },
@@ -116,40 +119,54 @@ async function showCopilotUsage(ctx: ExtensionContext): Promise<void> {
 
 export default function (pi: ExtensionAPI): void {
   let currentContext: ExtensionContext | undefined;
+  let sessionGeneration = 0;
+  const isCurrent = (generation: number) => () => generation === sessionGeneration;
 
   pi.events.on(OPEN_COPILOT_USAGE_EVENT, () => {
-    if (currentContext) void showCopilotUsage(currentContext);
+    if (currentContext) void showCopilotUsage(currentContext, isCurrent(sessionGeneration));
   });
 
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    const generation = ++sessionGeneration;
+    if (ctx.mode !== "tui") {
+      currentContext = undefined;
+      return;
+    }
     currentContext = ctx;
     ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(cachedUsage) || undefined);
     void refreshUsage()
-      .then((usage) => currentContext?.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage)))
+      .then((usage) => {
+        if (generation === sessionGeneration)
+          currentContext?.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage));
+      })
       .catch(() => {});
   });
 
   pi.on("agent_end", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
     currentContext = ctx;
+    const generation = sessionGeneration;
     void refreshUsage()
-      .then((usage) => currentContext?.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage)))
+      .then((usage) => {
+        if (generation === sessionGeneration)
+          currentContext?.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage));
+      })
       .catch(() => {});
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    sessionGeneration++;
     if (ctx.mode === "tui") ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, undefined);
     currentContext = undefined;
   });
 
   pi.registerCommand("copilot-usage", {
     description: "Show GitHub Copilot plan and quota usage",
-    handler: (_args, ctx) => showCopilotUsage(ctx),
+    handler: (_args, ctx) => showCopilotUsage(ctx, isCurrent(sessionGeneration)),
   });
 
   pi.registerShortcut("super+shift+u", {
     description: "Show GitHub Copilot AI-credit usage",
-    handler: (ctx) => showCopilotUsage(ctx),
+    handler: (ctx) => showCopilotUsage(ctx, isCurrent(sessionGeneration)),
   });
 }
