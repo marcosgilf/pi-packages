@@ -24,4 +24,32 @@ describe("pi-session extension", () => {
       expect.objectContaining({ description: "Show session token, cost, and context usage" }),
     );
   });
+
+  it("publishes context status in isolation and clears it on shutdown", () => {
+    const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => void>();
+    const setStatus = vi.fn();
+    const pi = {
+      on: (event: string, handler: (event: unknown, ctx: ExtensionContext) => void) => {
+        handlers.set(event, handler);
+        return vi.fn();
+      },
+      events: { on: vi.fn(() => vi.fn()), emit: vi.fn() },
+      registerCommand: vi.fn(),
+      registerShortcut: vi.fn(),
+      getSettings: () => ({ compaction: { enabled: true } }),
+    } as unknown as ExtensionAPI;
+    const ctx = {
+      mode: "tui",
+      model: { contextWindow: 1_000_000 },
+      getContextUsage: () => ({ percent: 19.4, tokens: 194_000, contextWindow: 1_000_000 }),
+      ui: { setStatus },
+    } as unknown as ExtensionContext;
+
+    extension(pi);
+    handlers.get("session_start")?.({}, ctx);
+    expect(setStatus).toHaveBeenLastCalledWith("pi-session", "19.4%/1.0M");
+
+    handlers.get("session_shutdown")?.({}, ctx);
+    expect(setStatus).toHaveBeenLastCalledWith("pi-session", undefined);
+  });
 });

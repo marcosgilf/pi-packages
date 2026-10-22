@@ -2,10 +2,9 @@ import { execFile } from "node:child_process";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type ModalContent, type ModalRow, showModal } from "@marcosgilf/pi-modal";
 import { type CopilotUsage, formatPlanUsage, formatUsageSummary, getUsageProgress, parseCopilotUsage } from "./core.ts";
-import { OPEN_COPILOT_USAGE_EVENT } from "./events.ts";
+import { COPILOT_USAGE_STATUS_KEY, OPEN_COPILOT_USAGE_EVENT } from "./events.ts";
 
 const CACHE_MS = 5 * 60 * 1000;
-const FOOTER_STATUS_KEY = "pi-usage";
 
 type UsageSnapshot = CopilotUsage & { fetchedAt: number };
 
@@ -97,14 +96,14 @@ async function showCopilotUsage(ctx: ExtensionContext): Promise<void> {
 
   try {
     const content = buildCopilotUsageModal(await refreshUsage(true));
-    ctx.ui.setStatus(FOOTER_STATUS_KEY, formatPlanUsage(cachedUsage));
+    ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(cachedUsage));
     await showModal(
       ctx,
       content,
       {
         refresh: async () => {
           const usage = await refreshUsage(true);
-          ctx.ui.setStatus(FOOTER_STATUS_KEY, formatPlanUsage(usage));
+          ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage));
           return buildCopilotUsageModal(usage);
         },
       },
@@ -125,9 +124,9 @@ export default function (pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
     currentContext = ctx;
-    ctx.ui.setStatus(FOOTER_STATUS_KEY, formatPlanUsage(cachedUsage) || undefined);
+    ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(cachedUsage) || undefined);
     void refreshUsage()
-      .then((usage) => currentContext?.ui.setStatus(FOOTER_STATUS_KEY, formatPlanUsage(usage)))
+      .then((usage) => currentContext?.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage)))
       .catch(() => {});
   });
 
@@ -135,12 +134,12 @@ export default function (pi: ExtensionAPI): void {
     if (ctx.mode !== "tui") return;
     currentContext = ctx;
     void refreshUsage()
-      .then((usage) => currentContext?.ui.setStatus(FOOTER_STATUS_KEY, formatPlanUsage(usage)))
+      .then((usage) => currentContext?.ui.setStatus(COPILOT_USAGE_STATUS_KEY, formatPlanUsage(usage)))
       .catch(() => {});
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
-    if (ctx.mode === "tui") ctx.ui.setStatus(FOOTER_STATUS_KEY, undefined);
+    if (ctx.mode === "tui") ctx.ui.setStatus(COPILOT_USAGE_STATUS_KEY, undefined);
     currentContext = undefined;
   });
 

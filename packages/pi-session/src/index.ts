@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type ModalContent, type ModalRow, showModal } from "@marcosgilf/pi-modal";
-import { formatSessionUsageSummary, summarizeSession } from "./core.ts";
-import { OPEN_SESSION_USAGE_EVENT } from "./events.ts";
+import { formatContextUsageIndicator, formatSessionUsageSummary, summarizeSession } from "./core.ts";
+import { OPEN_SESSION_USAGE_EVENT, SESSION_USAGE_STATUS_KEY } from "./events.ts";
 
 function buildSessionUsageModal(ctx: ExtensionContext, autoCompaction: boolean): ModalContent {
   const stats = summarizeSession(ctx.sessionManager.getEntries());
@@ -19,6 +19,14 @@ function buildSessionUsageModal(ctx: ExtensionContext, autoCompaction: boolean):
     { text: summary[summary.length - 1] },
   ];
   return { rows, clipboardText: summary.join("\n") };
+}
+
+function updateSessionStatus(ctx: ExtensionContext): void {
+  if (ctx.mode !== "tui") return;
+  const context = ctx.getContextUsage();
+  const contextWindow = context?.contextWindow ?? ctx.model?.contextWindow;
+  const status = contextWindow ? formatContextUsageIndicator(context?.percent ?? null, contextWindow).text : undefined;
+  ctx.ui.setStatus(SESSION_USAGE_STATUS_KEY, status);
 }
 
 async function showSessionUsage(ctx: ExtensionContext, autoCompaction: boolean): Promise<void> {
@@ -42,11 +50,19 @@ export default function (pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => {
     currentContext = ctx;
+    updateSessionStatus(ctx);
   });
   pi.on("agent_end", (_event, ctx) => {
     currentContext = ctx;
+    updateSessionStatus(ctx);
   });
-  pi.on("session_shutdown", () => {
+  pi.on("model_select", (_event, ctx) => {
+    currentContext = ctx;
+    updateSessionStatus(ctx);
+  });
+  pi.on("session_compact", (_event, ctx) => updateSessionStatus(ctx));
+  pi.on("session_shutdown", (_event, ctx) => {
+    if (ctx.mode === "tui") ctx.ui.setStatus(SESSION_USAGE_STATUS_KEY, undefined);
     currentContext = undefined;
   });
 

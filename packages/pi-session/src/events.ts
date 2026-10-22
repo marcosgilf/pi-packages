@@ -1,1 +1,2 @@
+export const SESSION_USAGE_STATUS_KEY = "pi-session";
 export const OPEN_SESSION_USAGE_EVENT = "pi-footer:open-session-usage";

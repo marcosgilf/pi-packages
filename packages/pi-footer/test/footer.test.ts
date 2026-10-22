@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI, TuiMouseEvent } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { OPEN_SESSION_USAGE_EVENT } from "@marcosgilf/pi-session/events";
-import { OPEN_COPILOT_USAGE_EVENT } from "@marcosgilf/pi-usage/events";
+import { OPEN_SESSION_USAGE_EVENT, SESSION_USAGE_STATUS_KEY } from "@marcosgilf/pi-session/events";
+import { COPILOT_USAGE_STATUS_KEY, OPEN_COPILOT_USAGE_EVENT } from "@marcosgilf/pi-usage/events";
 import { describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
 
@@ -28,7 +28,6 @@ describe("pi-footer", () => {
       cwd: "/repo",
       model: { id: "test-model", name: "Test model", reasoning: false, provider: "test" },
       thinkingLevel: "off",
-      getContextUsage: () => ({ percent: 50, tokens: 1000, contextWindow: 2000 }),
       sessionManager: { getSessionName: () => undefined },
       ui: { setFooter },
     } as unknown as ExtensionContext;
@@ -46,7 +45,8 @@ describe("pi-footer", () => {
       getAvailableProviderCount: () => 1,
       getExtensionStatuses: () =>
         new Map([
-          ["pi-usage", "Copilot Enterprise 20%"],
+          [SESSION_USAGE_STATUS_KEY, "50.0%/2.0k"],
+          [COPILOT_USAGE_STATUS_KEY, "Copilot Enterprise 20%"],
           ["caveman", "⠠⠄ caveman level: FULL"],
           ["ponytail", "○ 🐴 ponytail: ⚡ FULL"],
         ]),

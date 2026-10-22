@@ -32,6 +32,10 @@ export function formatTokens(tokens: number): string {
   return `${Math.round(tokens / 1_000_000)}M`;
 }
 
+export function getContextUsageStyle(percent: number | null): ContextUsageStyle {
+  return percent === null ? "dim" : percent > 90 ? "error" : percent > 70 ? "warning" : "text";
+}
+
 export function formatContextUsageIndicator(
   percent: number | null,
   contextWindow: number,
@@ -40,8 +44,7 @@ export function formatContextUsageIndicator(
   style: ContextUsageStyle;
 } {
   const label = percent === null ? "?" : `${percent.toFixed(1)}%`;
-  const style = percent === null ? "dim" : percent > 90 ? "error" : percent > 70 ? "warning" : "text";
-  return { text: `${label}/${formatTokens(contextWindow)}`, style };
+  return { text: `${label}/${formatTokens(contextWindow)}`, style: getContextUsageStyle(percent) };
 }
 
 export function formatSessionUsageSummary(
