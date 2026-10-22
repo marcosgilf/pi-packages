@@ -1,20 +1,3 @@
-import { execFile } from "node:child_process";
-
-type Usage = {
-  input?: number;
-  output?: number;
-  cacheRead?: number;
-  cacheWrite?: number;
-  cost?: { total?: number };
-};
-
-type UsageEntry = {
-  type?: string;
-  provider?: string;
-  usage?: Usage;
-  message?: { role?: string; provider?: string; usage?: Usage };
-};
-
 export type CopilotUsage = {
   plan: string;
   unit: "AI credits" | "premium requests";
@@ -24,14 +7,6 @@ export type CopilotUsage = {
   percentUsed?: number;
   resetAt?: string;
   unlimited: boolean;
-};
-
-export type SessionUsage = {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  cost: number;
 };
 
 const planNames: Record<string, string> = {
@@ -108,45 +83,6 @@ export function parseCopilotUsage(data: unknown): CopilotUsage {
   };
 }
 
-export function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
-  return Math.round(tokens).toLocaleString("en-US");
-}
-
-export type ContextUsageStyle = "error" | "warning" | "text" | "dim";
-
-export function formatContextUsageIndicator(
-  percent: number | null,
-  contextWindow: number,
-): {
-  text: string;
-  style: ContextUsageStyle;
-} {
-  const label = percent === null ? "?" : `${percent.toFixed(1)}%`;
-  const style = percent === null ? "dim" : percent > 90 ? "error" : percent > 70 ? "warning" : "text";
-  return { text: `${label}/${formatTokens(contextWindow)}`, style };
-}
-
-export function formatSessionUsageSummary(
-  stats: SessionUsage,
-  context?: { percent: number | null; tokens: number | null; contextWindow: number },
-): string[] {
-  const lines = ["Session usage"];
-  const promptTokens = stats.input + stats.cacheRead + stats.cacheWrite;
-  if (promptTokens > 0) lines.push(`Tokens ↑${formatTokens(promptTokens)} (${formatTokens(stats.cacheRead)} cached)`);
-  if (stats.output > 0) lines.push(`Tokens ↓${formatTokens(stats.output)}`);
-  if (stats.cacheWrite > 0) lines.push(`Cache write: ${formatTokens(stats.cacheWrite)}`);
-  if (stats.cost > 0) lines.push(`Cost: $${stats.cost.toFixed(3)}`);
-  if (lines.length === 1) lines.push("No token usage in this session");
-  lines.push(
-    context
-      ? `Context: ${context.percent === null ? "?" : `${context.percent.toFixed(1)}%`} · ${context.tokens === null ? "?" : formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}`
-      : "Context: unavailable",
-  );
-  return lines;
-}
-
 export function formatPlanUsage(usage?: CopilotUsage): string {
   if (!usage) return "";
   return usage.unlimited ? `${usage.plan} ∞` : `${usage.plan} ${usage.percentUsed ?? 0}%`;
@@ -169,47 +105,4 @@ export function formatUsageSummary(usage: CopilotUsage): [string, string, string
 
 export function getUsageProgress(usage: CopilotUsage): number | undefined {
   return usage.unlimited ? undefined : (usage.percentUsed ?? 0);
-}
-
-export function writeClipboard(text: string, command = "pbcopy"): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = execFile(command, (error) => (error ? reject(error) : resolve()));
-    child.stdin?.on("error", reject);
-    child.stdin?.end(text);
-  });
-}
-
-export function formatProgressBar(percent: number, width: number): string {
-  const cells = Math.max(0, Math.floor(width));
-  const value = Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
-  const filled = Math.round((value / 100) * cells);
-  return `${"█".repeat(filled)}${"░".repeat(cells - filled)}`;
-}
-
-export function summarizeSession(entries: readonly unknown[], provider?: string): SessionUsage {
-  const total = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
-  const add = (usage?: Usage) => {
-    if (!usage) return;
-    for (const key of ["input", "output", "cacheRead", "cacheWrite"] as const) {
-      const value = usage[key];
-      if (typeof value === "number" && Number.isFinite(value) && value > 0) total[key] += value;
-    }
-    const cost = usage.cost?.total;
-    if (typeof cost === "number" && Number.isFinite(cost) && cost > 0) total.cost += cost;
-  };
-
-  for (const rawEntry of entries) {
-    if (!rawEntry || typeof rawEntry !== "object") continue;
-    const entry = rawEntry as UsageEntry;
-    if (
-      entry.type === "message" &&
-      entry.message?.role === "assistant" &&
-      (!provider || entry.message.provider === provider)
-    ) {
-      add(entry.message.usage);
-    } else if (entry.type === "usage" && (!provider || entry.provider === provider)) {
-      add(entry.usage);
-    }
-  }
-  return total;
 }

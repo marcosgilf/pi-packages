@@ -19,10 +19,17 @@
     "README.md",
     "LICENSE"
   ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./events": "./src/events.ts"
+  },
   "pi": {
     "extensions": [
       "./src/index.ts"
     ]
+  },
+  "dependencies": {
+    "@marcosgilf/pi-modal": "^0.1.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

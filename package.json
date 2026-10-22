@@ -12,14 +12,16 @@
   ],
   "pi": {
     "extensions": [
-      "./packages/pi-usage/src/index.ts"
+      "./packages/pi-session/src/index.ts",
+      "./packages/pi-usage/src/index.ts",
+      "./packages/pi-footer/src/index.ts"
     ]
   },
   "scripts": {
     "check": "npm run lint && npm run typecheck",
     "format": "biome check --write .",
     "lint": "biome check . --error-on-warnings",
-    "typecheck": "npm --workspace @marcosgilf/pi-usage run typecheck",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",

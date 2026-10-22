@@ -16,8 +16,10 @@ npm run check
 
 ## Packages
 
-- [`pi-usage`](./packages/pi-usage) — GitHub Copilot plan and quota usage.
-  [![npm version](https://img.shields.io/npm/v/@marcosgilf/pi-usage)](https://www.npmjs.com/package/@marcosgilf/pi-usage) · [changelog](./packages/pi-usage/CHANGELOG.md) · [GitHub releases](https://github.com/marcosgilf/pi-packages/releases)
+- [`pi-footer`](./packages/pi-footer) — one footer owner that combines session and Copilot usage.
+- [`pi-session`](./packages/pi-session) — session token, cache, cost, and context details.
+- [`pi-usage`](./packages/pi-usage) — GitHub Copilot plan and quota details.
+- [`pi-modal`](./packages/pi-modal) — shared modal UI library.
 
 ## Add a package
 

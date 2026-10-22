@@ -1,5 +1,8 @@
 ---
+"@marcosgilf/pi-footer": patch
+"@marcosgilf/pi-modal": patch
+"@marcosgilf/pi-session": patch
 "@marcosgilf/pi-usage": minor
 ---
 
-Add session token, cost, and context details in a modal and simplify the footer.
+Split session usage into its own extension, share modal UI, and make pi-footer the sole custom footer owner.
