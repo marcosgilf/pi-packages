@@ -1,6 +1,6 @@
 {
   "name": "@marcosgilf/pi-footer",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "One Pi footer that combines session and Copilot usage extensions.",
   "type": "module",
   "license": "MIT",
@@ -23,8 +23,8 @@
     ]
   },
   "dependencies": {
-    "@marcosgilf/pi-session": "^0.1.0",
-    "@marcosgilf/pi-usage": "^0.2.0"
+    "@marcosgilf/pi-session": "^0.0.0",
+    "@marcosgilf/pi-usage": "^0.1.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
