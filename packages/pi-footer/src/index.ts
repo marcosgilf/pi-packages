@@ -1,10 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type TuiMouseEvent, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { formatContextUsageIndicator } from "@marcosgilf/pi-session/core";
-import { OPEN_SESSION_USAGE_EVENT } from "@marcosgilf/pi-session/events";
-import { OPEN_COPILOT_USAGE_EVENT } from "@marcosgilf/pi-usage/events";
-
-const USAGE_STATUS_KEY = "pi-usage";
+import { getContextUsageStyle } from "@marcosgilf/pi-session/core";
+import { OPEN_SESSION_USAGE_EVENT, SESSION_USAGE_STATUS_KEY } from "@marcosgilf/pi-session/events";
+import { COPILOT_USAGE_STATUS_KEY, OPEN_COPILOT_USAGE_EVENT } from "@marcosgilf/pi-usage/events";
 
 type ClickBounds = { left: number; right: number };
 
@@ -48,11 +46,11 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
       },
       invalidate() {},
       render(width: number) {
-        const context = ctx.getContextUsage();
-        const contextIndicator = context
-          ? formatContextUsageIndicator(context.percent, context.contextWindow)
-          : undefined;
-        const contextLabel = contextIndicator ? theme.fg(contextIndicator.style, contextIndicator.text) : "";
+        const contextText = footerData.getExtensionStatuses().get(SESSION_USAGE_STATUS_KEY) ?? "";
+        const contextPercent = Number.parseFloat(contextText);
+        const contextLabel = contextText
+          ? theme.fg(getContextUsageStyle(Number.isFinite(contextPercent) ? contextPercent : null), contextText)
+          : "";
 
         const model = ctx.model;
         const modelName = model?.name || model?.id || "no-model";
@@ -60,7 +58,7 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
         let modelText = `${modelName}${thinking}`;
         if (footerData.getAvailableProviderCount() > 1 && model) modelText = `(${model.provider}) ${modelText}`;
 
-        const usageText = footerData.getExtensionStatuses().get(USAGE_STATUS_KEY) ?? "";
+        const usageText = footerData.getExtensionStatuses().get(COPILOT_USAGE_STATUS_KEY) ?? "";
         const usageLabel = usageText ? theme.fg(usageStyle(usageText), usageText) : "";
         const right = usageLabel ? `${usageLabel} · ${modelText}` : modelText;
         const clippedRight = truncateToWidth(right, width, "");
@@ -75,7 +73,7 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
         if (sessionName) cwd += ` • ${sessionName}`;
 
         const statuses = Array.from(footerData.getExtensionStatuses().entries())
-          .filter(([key]) => key !== USAGE_STATUS_KEY)
+          .filter(([key]) => key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, text]) => text);
         const statusText = [contextLabel, statuses.join(" ")].filter(Boolean).join(" · ");

@@ -5,4 +5,4 @@
 "@marcosgilf/pi-usage": minor
 ---
 
-Split session usage into its own extension, share modal UI, and make pi-footer the sole custom footer owner.
+Give pi-session and pi-usage standalone indicators and modals, share modal UI, and let pi-footer arrange both in one responsive footer.
