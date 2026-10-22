@@ -113,7 +113,7 @@ async function showCopilotUsage(ctx: ExtensionContext, isCurrent: () => boolean)
       unavailableMessage,
     );
   } catch (error) {
-    ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+    if (isCurrent()) ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
   }
 }
 
