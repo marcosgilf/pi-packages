@@ -60,6 +60,10 @@ export default function (pi: ExtensionAPI): void {
     currentContext = ctx;
     updateSessionStatus(ctx);
   });
+  pi.on("session_tree", (_event, ctx) => {
+    currentContext = ctx;
+    updateSessionStatus(ctx);
+  });
   pi.on("session_compact", (_event, ctx) => updateSessionStatus(ctx));
   pi.on("session_shutdown", (_event, ctx) => {
     if (ctx.mode === "tui") ctx.ui.setStatus(SESSION_USAGE_STATUS_KEY, undefined);

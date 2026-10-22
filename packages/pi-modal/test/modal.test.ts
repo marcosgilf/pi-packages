@@ -9,9 +9,9 @@ const theme = {
   bold: (text: string) => text,
 } as unknown as Theme;
 
-function createTui(): TUI {
+function createTui(rows = 24): TUI {
   return {
-    terminal: { rows: 24 },
+    terminal: { rows },
     requestRender: vi.fn(),
   } as unknown as TUI;
 }
@@ -84,6 +84,36 @@ describe("shared modal", () => {
 
     component.handleMouse?.(click(0, top + 1));
     expect(done).toHaveBeenCalledOnce();
+  });
+
+  it("keeps quota details, reset time, and controls visible on short screens", () => {
+    const content: ModalContent = {
+      rows: [
+        { text: "Copilot usage and plan", style: "accent" },
+        { text: "" },
+        { text: "Plan: Copilot Enterprise" },
+        { text: "" },
+        { text: "AI credits: 5,000 / 20,000 (25% used)" },
+        { text: "" },
+        { text: "", progress: 25, style: "success" },
+        { text: "" },
+        { text: "Resets: Nov 1 UTC" },
+      ],
+      clipboardText: "Copilot summary",
+    };
+
+    for (const height of [12, 10]) {
+      const component = createModalComponent(createTui(height), theme, keybindings, vi.fn(), content, {
+        refresh: async () => content,
+      });
+      const rendered = component.render(80).join("\n");
+      expect(rendered).toContain("Copilot usage and plan");
+      expect(rendered).toContain("AI credits: 5,000 / 20,000 (25% used)");
+      expect(rendered).toContain("Resets: Nov 1 UTC");
+      expect(rendered).toContain("r refresh · c copy full summary");
+      expect(rendered).toContain("██");
+      component.dispose();
+    }
   });
 
   it("copies the active TUI selection with Command+C", async () => {

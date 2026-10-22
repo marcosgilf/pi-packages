@@ -59,7 +59,12 @@ function modalScreen(
   theme: Theme,
 ): { lines: string[]; bounds: { left: number; top: number; right: number; bottom: number } } {
   const panelWidth = Math.min(width, 74);
-  const panel = borderedRows([{ text: "" }, ...rows, { text: "" }], panelWidth, theme);
+  const paddedRows = [{ text: "" }, ...rows, { text: "" }];
+  let panel = borderedRows(paddedRows, panelWidth, theme);
+  if (panel.length > height) {
+    const compactRows = rows.filter(({ text, progress }) => text.length > 0 || progress !== undefined);
+    panel = borderedRows(compactRows, panelWidth, theme);
+  }
   const left = Math.floor((width - panelWidth) / 2);
   const top = Math.max(0, Math.floor((height - panel.length) / 2));
   const screen = Array.from({ length: height }, () => " ".repeat(width));
