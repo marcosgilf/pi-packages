@@ -21,6 +21,15 @@ npm run check
 - [`pi-usage`](./packages/pi-usage) — Copilot plan/percentage in Pi's default footer plus quota details.
 - [`pi-modal`](./packages/pi-modal) — shared modal UI library.
 
+## Versioning
+
+Use Changesets for published packages:
+
+- Start each new package at `0.0.0`; add a `minor` changeset for its first `0.1.0` release.
+- Bump existing packages from their latest published version. For example, `pi-usage@0.1.0` needs a `minor` changeset to release as `0.2.0`.
+- Keep internal semver ranges compatible with current workspace versions. Set `bumpVersionsWithWorkspaceProtocolOnly` to `false` so Changesets updates those ranges in its version PR.
+- Merge the Changesets version PR to publish packages. Do not pre-bump new package manifests to `0.1.0` with a patch changeset; that releases `0.1.1`.
+
 ## Add a package
 
 Create a workspace under `packages/<name>` and declare Pi host packages in `peerDependencies`.
