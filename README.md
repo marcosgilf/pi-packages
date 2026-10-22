@@ -23,9 +23,10 @@ npm run check
 
 ## Add a package
 
-Create a workspace under `packages/<name>`, declare its Pi entrypoint and Pi host packages in
-`peerDependencies`, then list its source entrypoint in the root `pi.extensions` manifest. Keep
-package versions independent; use `npm run changeset` for published behavior changes.
+Create a workspace under `packages/<name>` and declare Pi host packages in `peerDependencies`.
+List standalone extensions in the root `pi.extensions` manifest; owner extensions can import and
+invoke feature-package factories through declared dependencies. Keep package versions independent;
+use `npm run changeset` for published behavior changes.
 
 ## CI and releases
 

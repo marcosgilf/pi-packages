@@ -1,7 +1,9 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type TuiMouseEvent, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import registerSession from "@marcosgilf/pi-session";
 import { getContextUsageStyle } from "@marcosgilf/pi-session/core";
 import { OPEN_SESSION_USAGE_EVENT, SESSION_USAGE_STATUS_KEY } from "@marcosgilf/pi-session/events";
+import registerUsage from "@marcosgilf/pi-usage";
 import { COPILOT_USAGE_STATUS_KEY, OPEN_COPILOT_USAGE_EVENT } from "@marcosgilf/pi-usage/events";
 
 type ClickBounds = { left: number; right: number };
@@ -111,6 +113,9 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
 }
 
 export default function (pi: ExtensionAPI): void {
+  registerSession(pi);
+  registerUsage(pi);
+
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode === "tui") addCustomFooter(ctx, pi);
   });
