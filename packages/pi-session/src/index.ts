@@ -56,6 +56,10 @@ export default function (pi: ExtensionAPI): void {
     currentContext = ctx;
     updateSessionStatus(ctx);
   });
+  pi.on("turn_end", (_event, ctx) => {
+    currentContext = ctx;
+    updateSessionStatus(ctx);
+  });
   pi.on("model_select", (_event, ctx) => {
     currentContext = ctx;
     updateSessionStatus(ctx);
