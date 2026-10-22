@@ -46,8 +46,22 @@ describe("pi-session extension", () => {
     } as unknown as ExtensionContext;
 
     extension(pi);
-    handlers.get("session_start")?.({}, ctx);
+    handlers.get("session_start")?.({ reason: "startup" }, ctx);
     expect(setStatus).toHaveBeenLastCalledWith("pi-session", "19.4%/1.0M");
+
+    const resumedContext = {
+      ...ctx,
+      getContextUsage: () => ({ percent: 8, tokens: 80_000, contextWindow: 1_000_000 }),
+    } as ExtensionContext;
+    handlers.get("session_start")?.({ reason: "resume" }, resumedContext);
+    expect(setStatus).toHaveBeenLastCalledWith("pi-session", "8.0%/1.0M");
+
+    const turnContext = {
+      ...ctx,
+      getContextUsage: () => ({ percent: 35.5, tokens: 355_000, contextWindow: 1_000_000 }),
+    } as ExtensionContext;
+    handlers.get("turn_end")?.({ type: "turn_end" }, turnContext);
+    expect(setStatus).toHaveBeenLastCalledWith("pi-session", "35.5%/1.0M");
 
     const navigatedContext = {
       ...ctx,
