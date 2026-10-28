@@ -74,11 +74,22 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
         const sessionName = ctx.sessionManager.getSessionName();
         if (sessionName) cwd += ` • ${sessionName}`;
 
+        // shortcut: count non-hidden registered namespaces, not offline configs; use a Pi MCP status API if one becomes public.
+        const mcpServers = new Set(
+          pi
+            .getAllTools()
+            .flatMap(({ namespace, exposure }) =>
+              namespace?.name.startsWith("mcp__") && exposure !== "hidden" ? [namespace.name] : [],
+            ),
+        );
+        const mcpStatus = mcpServers.size
+          ? `🔌 MCP: ${mcpServers.size} server${mcpServers.size === 1 ? "" : "s"} enabled`
+          : "";
         const statuses = Array.from(footerData.getExtensionStatuses().entries())
           .filter(([key]) => key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, text]) => text);
-        const statusText = [contextLabel, statuses.join(" ")].filter(Boolean).join(" · ");
+        const statusText = [contextLabel, mcpStatus, statuses.join(" ")].filter(Boolean).join(" · ");
         const statusWidth = visibleWidth(statusText);
         const statusLine = truncateToWidth(statusText, width, theme.fg("dim", "..."));
         const statusClickRight = Math.min(visibleWidth(contextLabel), visibleWidth(statusLine));

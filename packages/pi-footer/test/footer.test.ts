@@ -25,6 +25,11 @@ describe("pi-footer", () => {
 
       const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => void>>();
       const statuses = new Map<string, string>();
+      const mcpTools = [
+        { namespace: { name: "mcp__chrome_devtools" }, exposure: "codemode" },
+        { namespace: { name: "mcp__chrome_devtools" }, exposure: "codemode" },
+        { namespace: { name: "mcp__disabled" }, exposure: "hidden" },
+      ];
       const emit = vi.fn();
       const setFooter = vi.fn();
       const registerCommand = vi.fn();
@@ -42,6 +47,7 @@ describe("pi-footer", () => {
         },
         events: { emit, on: vi.fn(() => vi.fn()) },
         getSettings: () => ({ compaction: { enabled: true } }),
+        getAllTools: () => mcpTools,
         registerCommand,
         registerShortcut,
       } as unknown as ExtensionAPI;
@@ -90,14 +96,16 @@ describe("pi-footer", () => {
       };
       const footerFactory = setFooter.mock.calls[0][0];
       const component = footerFactory(tui, theme, footerData);
-      const wideLines = component.render(120);
+      const wideLines = component.render(160);
       const wideStats = wideLines[1];
       const contextX = visibleWidth(wideStats.slice(0, wideStats.indexOf("50.0%/2.0k")));
       const usageX = visibleWidth(wideStats.slice(0, wideStats.indexOf("Copilot Enterprise")));
 
       expect(wideLines).toHaveLength(2);
       expect(wideLines[0]).toContain("/repo");
-      expect(wideStats.indexOf("50.0%/2.0k")).toBeLessThan(wideStats.indexOf("caveman level: FULL"));
+      expect(wideStats).toContain("🔌 MCP: 1 server enabled");
+      expect(wideStats.indexOf("50.0%/2.0k")).toBeLessThan(wideStats.indexOf("🔌 MCP"));
+      expect(wideStats.indexOf("🔌 MCP")).toBeLessThan(wideStats.indexOf("caveman level: FULL"));
       expect(wideStats.indexOf("ponytail: ⚡ FULL")).toBeLessThan(usageX);
 
       const mouse = (type: TuiMouseEvent["type"], x: number, y: number) =>
@@ -111,6 +119,7 @@ describe("pi-footer", () => {
       expect(smallLines).toHaveLength(3);
       expect(smallLines[1]?.trimStart()).toMatch(/^Copilot Enterprise/);
       expect(smallLines[2]).toContain("50.0%/2.0k ·");
+      expect(smallLines[2]).toContain("🔌 MCP: 1 server enabled");
       component.handleMouse?.(mouse("click", 0, 2));
       component.handleMouse?.(mouse("click", 0, 1));
 
@@ -118,6 +127,8 @@ describe("pi-footer", () => {
       expect(emit).toHaveBeenNthCalledWith(2, OPEN_COPILOT_USAGE_EVENT, undefined);
       expect(emit).toHaveBeenNthCalledWith(3, OPEN_SESSION_USAGE_EVENT, undefined);
       expect(emit).toHaveBeenNthCalledWith(4, OPEN_COPILOT_USAGE_EVENT, undefined);
+      mcpTools.push({ namespace: { name: "mcp__second" }, exposure: "direct" });
+      expect(component.render(160).join("\n")).toContain("🔌 MCP: 2 servers enabled");
       component.dispose?.();
 
       await dispatch("session_shutdown");
