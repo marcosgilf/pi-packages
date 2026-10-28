@@ -2,4 +2,4 @@
 "@marcosgilf/pi-footer": patch
 ---
 
-Show enabled MCP server count in custom footer.
+Show MCP status through Pi's default footer without replacing its native rendering.
