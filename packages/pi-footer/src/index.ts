@@ -13,6 +13,25 @@ function usageStyle(text: string): "warning" | "accent" {
   return match && Number(match[1]) >= 90 ? "warning" : "accent";
 }
 
+function getMcpStatus(pi: ExtensionAPI): string {
+  // shortcut: count registered MCP tool namespaces, not offline configs; use a Pi server-status API if one becomes public.
+  const servers = new Set(
+    pi
+      .getAllTools()
+      .flatMap(({ namespace, exposure }) =>
+        namespace?.name.startsWith("mcp__") && exposure !== "hidden" ? [namespace.name] : [],
+      ),
+  );
+  return servers.size ? `🔌 MCP: ${servers.size} server${servers.size === 1 ? "" : "s"} enabled` : "";
+}
+
+function sanitizeStatus(text: string): string {
+  return text
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/ +/g, " ")
+    .trim();
+}
+
 function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
   ctx.ui.setFooter((tui, theme, footerData) => {
     let disposed = false;
@@ -20,10 +39,9 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
       if (!disposed) tui.requestRender();
     };
     const unsubscribe = footerData.onBranchChange(requestRender);
+    let sessionClickBounds: ClickBounds | undefined;
     let usageClickBounds: ClickBounds | undefined;
-    let contextClickBounds: ClickBounds | undefined;
-    let usageClickRow = 1;
-    let contextClickRow = 1;
+    let sessionClickRow = 1;
 
     return {
       dispose() {
@@ -32,79 +50,94 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
       },
       handleMouse(event: TuiMouseEvent) {
         if (event.button !== "left" || event.type !== "click") return;
+        const clickedSession =
+          event.y === sessionClickRow &&
+          sessionClickBounds !== undefined &&
+          event.x >= sessionClickBounds.left &&
+          event.x < sessionClickBounds.right;
         const clickedUsage =
-          event.y === usageClickRow &&
+          event.y === 1 &&
           usageClickBounds !== undefined &&
           event.x >= usageClickBounds.left &&
           event.x < usageClickBounds.right;
-        const clickedContext =
-          event.y === contextClickRow &&
-          contextClickBounds !== undefined &&
-          event.x >= contextClickBounds.left &&
-          event.x < contextClickBounds.right;
-        if (!clickedUsage && !clickedContext) return;
-        pi.events.emit(clickedContext ? OPEN_SESSION_USAGE_EVENT : OPEN_COPILOT_USAGE_EVENT, undefined);
+        if (!clickedSession && !clickedUsage) return;
+        pi.events.emit(clickedSession ? OPEN_SESSION_USAGE_EVENT : OPEN_COPILOT_USAGE_EVENT, undefined);
         return { handled: true, render: true };
       },
       invalidate() {},
       render(width: number) {
-        const contextText = footerData.getExtensionStatuses().get(SESSION_USAGE_STATUS_KEY) ?? "";
+        const statuses = footerData.getExtensionStatuses();
+        const contextText = statuses.get(SESSION_USAGE_STATUS_KEY) ?? "";
         const contextPercent = Number.parseFloat(contextText);
-        const contextLabel = contextText
-          ? theme.fg(getContextUsageStyle(Number.isFinite(contextPercent) ? contextPercent : null), contextText)
+        const autoCompaction = pi.getSettings().compaction?.enabled !== false;
+        const sessionText = contextText
+          ? theme.fg(
+              getContextUsageStyle(Number.isFinite(contextPercent) ? contextPercent : null),
+              `${contextText}${autoCompaction ? " (auto)" : ""}`,
+            )
           : "";
+        const otherStatuses = Array.from(statuses.entries())
+          .filter(([key]) => key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([, text]) => sanitizeStatus(text));
+        const left = [sessionText, getMcpStatus(pi), otherStatuses.join(" ")].filter(Boolean).join(" · ");
 
         const model = ctx.model;
-        const modelName = model?.name || model?.id || "no-model";
-        const thinking = model?.reasoning ? ` • ${ctx.thinkingLevel || "off"}` : "";
+        const modelName = model?.id || "no-model";
+        const thinking = model?.reasoning
+          ? ctx.thinkingLevel === "off"
+            ? " • thinking off"
+            : ` • thinking ${ctx.thinkingLevel || "off"}`
+          : "";
         let modelText = `${modelName}${thinking}`;
         if (footerData.getAvailableProviderCount() > 1 && model) modelText = `(${model.provider}) ${modelText}`;
-
-        const usageText = footerData.getExtensionStatuses().get(COPILOT_USAGE_STATUS_KEY) ?? "";
+        const usageText = statuses.get(COPILOT_USAGE_STATUS_KEY) ?? "";
         const usageLabel = usageText ? theme.fg(usageStyle(usageText), usageText) : "";
-        const right = usageLabel ? `${usageLabel} · ${modelText}` : modelText;
-        const clippedRight = truncateToWidth(right, width, "");
+        const right = [usageLabel, theme.fg("dim", modelText)].filter(Boolean).join(" · ");
+        const clippedRight = truncateToWidth(right, width, theme.fg("dim", "..."));
         const rightWidth = visibleWidth(clippedRight);
-        const usageWidth = visibleWidth(usageLabel);
-        const usageRight = Math.min(usageWidth, rightWidth);
+
         const home = process.env.HOME || "";
-        let cwd = home && ctx.cwd.startsWith(`${home}/`) ? `~${ctx.cwd.slice(home.length)}` : ctx.cwd;
+        let cwd =
+          home && ctx.cwd === home
+            ? "~"
+            : home && ctx.cwd.startsWith(`${home}/`)
+              ? `~${ctx.cwd.slice(home.length)}`
+              : ctx.cwd;
         const branch = footerData.getGitBranch();
         if (branch) cwd += ` (${branch})`;
         const sessionName = ctx.sessionManager.getSessionName();
         if (sessionName) cwd += ` • ${sessionName}`;
-
-        const statuses = Array.from(footerData.getExtensionStatuses().entries())
-          .filter(([key]) => key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([, text]) => text);
-        const statusText = [contextLabel, statuses.join(" ")].filter(Boolean).join(" · ");
-        const statusWidth = visibleWidth(statusText);
-        const statusLine = truncateToWidth(statusText, width, theme.fg("dim", "..."));
-        const statusClickRight = Math.min(visibleWidth(contextLabel), visibleWidth(statusLine));
         const lines = [truncateToWidth(theme.fg("dim", cwd), width, theme.fg("dim", "..."))];
 
-        if (statusText && statusWidth + rightWidth + 2 <= width) {
-          const rightLeft = width - rightWidth;
-          lines.push(`${statusText}${" ".repeat(Math.max(0, rightLeft - statusWidth))}${clippedRight}`);
-          contextClickBounds = contextLabel ? { left: 0, right: statusClickRight } : undefined;
-          usageClickBounds = usageRight > 0 ? { left: rightLeft, right: rightLeft + usageRight } : undefined;
-          contextClickRow = 1;
-          usageClickRow = 1;
-        } else if (statusText) {
-          lines.push(clippedRight, statusLine);
-          contextClickBounds = contextLabel ? { left: 0, right: statusClickRight } : undefined;
-          usageClickBounds = usageRight > 0 ? { left: 0, right: usageRight } : undefined;
-          contextClickRow = 2;
-          usageClickRow = 1;
-        } else {
-          lines.push(`${" ".repeat(Math.max(0, width - rightWidth))}${clippedRight}`);
-          contextClickBounds = undefined;
-          usageClickBounds =
-            usageRight > 0 ? { left: width - rightWidth, right: width - rightWidth + usageRight } : undefined;
-          contextClickRow = 1;
-          usageClickRow = 1;
+        const ellipsis = theme.fg("dim", "...");
+        const rightLeft = width - rightWidth;
+        let usageLeft = 0;
+        let sessionLine = "";
+        sessionClickRow = 1;
+        if (left && right && visibleWidth(left) + rightWidth + 2 <= width) {
+          usageLeft = rightLeft;
+          sessionLine = truncateToWidth(left, width - rightWidth - 2, ellipsis);
+          const spaces = Math.max(2, rightLeft - visibleWidth(sessionLine));
+          lines.push(`${sessionLine}${" ".repeat(spaces)}${clippedRight}`);
+        } else if (left && right) {
+          lines.push(clippedRight);
+          sessionLine = truncateToWidth(left, width, ellipsis);
+          lines.push(sessionLine);
+          sessionClickRow = 2;
+        } else if (left) {
+          sessionLine = truncateToWidth(left, width, ellipsis);
+          lines.push(sessionLine);
+        } else if (right) {
+          lines.push(clippedRight);
         }
+
+        const sessionWidth = Math.min(visibleWidth(sessionText), visibleWidth(sessionLine));
+        sessionClickBounds = sessionWidth > 0 ? { left: 0, right: sessionWidth } : undefined;
+        usageClickBounds =
+          usageLabel && right
+            ? { left: usageLeft, right: usageLeft + Math.min(visibleWidth(usageLabel), rightWidth) }
+            : undefined;
 
         return lines;
       },

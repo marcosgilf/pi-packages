@@ -1,6 +1,6 @@
 # pi-footer
 
-Single owner for Pi's custom footer. It loads `pi-session` and `pi-usage`, then combines their data and click actions. Both feature extensions use `pi-modal` for details.
+Responsive custom footer for Pi's session context, Copilot usage, and extension statuses. It uses Pi's footer data and session APIs to keep native information while arranging extension details around it.
 
 ## Install
 
@@ -10,10 +10,11 @@ pi install npm:@marcosgilf/pi-footer
 
 `pi-footer` loads `pi-session` and `pi-usage` from package dependencies. Remove separate `npm:@marcosgilf/pi-session` and `npm:@marcosgilf/pi-usage` entries from Pi settings to avoid loading either extension twice.
 
-- Click context indicator to open session details.
-- Click Copilot plan usage to open quota details.
-- Wide terminals combine session/skill info on the left and usage/model info on the right; narrow terminals stack usage/model and session/skill lines.
-- `/session-usage` and Command+Shift+S (`super+shift+s`) open session details.
-- `/copilot-usage` and `super+shift+u` open Copilot details.
+- Wide terminals show the path, then session context and Pi extension statuses on the left with Copilot usage and model on the right.
+- Narrow terminals stack path, usage/model, and session/status lines. Copilot/model starts at the left edge; long text ends with `...`.
+- MCP count includes non-hidden registered tool namespaces; offline or zero-tool configured servers are not counted.
+- Click session context or Copilot usage to open details. `/session-usage` and Command+Shift+S (`super+shift+s`) also open session details; `/copilot-usage` and `super+shift+u` open Copilot quota details.
+
+A custom footer replaces Pi's built-in layout. Pi does not expose a public API to compose its built-in footer component, so this extension uses Pi's public footer data and context status APIs to preserve available statuses in a custom layout.
 
 Pi extensions run with Pi's operating-system permissions. Review package source before installing.

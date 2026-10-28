@@ -12,7 +12,7 @@ import extension from "../src/index.ts";
 afterEach(() => vi.unstubAllEnvs());
 
 describe("pi-footer", () => {
-  it("composes standalone statuses, adapts to width, and preserves selection", async () => {
+  it("positions session and usage around Pi's extension statuses responsively", async () => {
     const directory = await mkdtemp(join(tmpdir(), "pi-footer-test-"));
     try {
       const gh = join(directory, "gh");
@@ -25,6 +25,11 @@ describe("pi-footer", () => {
 
       const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => void>>();
       const statuses = new Map<string, string>();
+      const mcpTools = [
+        { namespace: { name: "mcp__chrome_devtools" }, exposure: "codemode" },
+        { namespace: { name: "mcp__chrome_devtools" }, exposure: "codemode" },
+        { namespace: { name: "mcp__disabled" }, exposure: "hidden" },
+      ];
       const emit = vi.fn();
       const setFooter = vi.fn();
       const registerCommand = vi.fn();
@@ -42,16 +47,23 @@ describe("pi-footer", () => {
         },
         events: { emit, on: vi.fn(() => vi.fn()) },
         getSettings: () => ({ compaction: { enabled: true } }),
+        getAllTools: () => mcpTools,
         registerCommand,
         registerShortcut,
       } as unknown as ExtensionAPI;
       const ctx = {
         mode: "tui",
         cwd: "/repo",
-        model: { id: "test-model", name: "Test model", reasoning: false, provider: "test", contextWindow: 2000 },
+        model: {
+          id: "test-model",
+          name: "Test model",
+          reasoning: false,
+          provider: "kimi-coding",
+          contextWindow: 1_000_000,
+        },
         thinkingLevel: "off",
-        getContextUsage: () => ({ percent: 50, tokens: 1000, contextWindow: 2000 }),
-        sessionManager: { getSessionName: () => undefined },
+        getContextUsage: () => ({ percent: 17.4, tokens: 174_000, contextWindow: 1_000_000 }),
+        sessionManager: { getSessionName: () => "test-session" },
         ui: { setFooter, setStatus },
       } as unknown as ExtensionContext;
       const dispatch = async (event: string) => {
@@ -61,7 +73,11 @@ describe("pi-footer", () => {
       extension(pi);
       await dispatch("session_start");
       await vi.waitFor(() => expect(statuses.get(COPILOT_USAGE_STATUS_KEY)).toBe("Copilot Enterprise 25%"));
-      expect(statuses.get(SESSION_USAGE_STATUS_KEY)).toBe("50.0%/2.0k");
+      statuses.set("caveman", "caveman level: FULL");
+      statuses.set("ponytail", "○ 🐴 ponytail: ⚡ FULL");
+      statuses.set("skill-test", "skill: test");
+      expect(setFooter).toHaveBeenCalledOnce();
+      expect(statuses.get(SESSION_USAGE_STATUS_KEY)).toBe("17.4%/1.0M");
       expect(registerCommand).toHaveBeenCalledWith(
         "session-usage",
         expect.objectContaining({ description: "Show session token, cost, and context usage" }),
@@ -72,54 +88,60 @@ describe("pi-footer", () => {
       );
       expect(registerShortcut).toHaveBeenCalledWith("super+shift+s", expect.any(Object));
       expect(registerShortcut).toHaveBeenCalledWith("super+shift+u", expect.any(Object));
-      expect(setFooter).toHaveBeenCalledOnce();
 
-      statuses.set("caveman", "⠠⠄ caveman level: FULL");
-      statuses.set("ponytail", "○ 🐴 ponytail: ⚡ FULL");
       const theme = {
         fg: (_style: string, text: string) => text,
-        bg: (_style: string, text: string) => text,
-        bold: (text: string) => text,
       } as unknown as Theme;
       const tui = { requestRender: vi.fn() } as unknown as TUI;
       const footerData = {
         onBranchChange: () => vi.fn(),
         getAvailableProviderCount: () => 1,
         getExtensionStatuses: () => statuses,
-        getGitBranch: () => undefined,
+        getGitBranch: () => "main",
       };
       const footerFactory = setFooter.mock.calls[0][0];
       const component = footerFactory(tui, theme, footerData);
-      const wideLines = component.render(120);
-      const wideStats = wideLines[1];
-      const contextX = visibleWidth(wideStats.slice(0, wideStats.indexOf("50.0%/2.0k")));
-      const usageX = visibleWidth(wideStats.slice(0, wideStats.indexOf("Copilot Enterprise")));
+      const wideLines = component.render(160);
+      const wideStats = wideLines[1] ?? "";
 
       expect(wideLines).toHaveLength(2);
-      expect(wideLines[0]).toContain("/repo");
-      expect(wideStats.indexOf("50.0%/2.0k")).toBeLessThan(wideStats.indexOf("caveman level: FULL"));
-      expect(wideStats.indexOf("ponytail: ⚡ FULL")).toBeLessThan(usageX);
+      expect(wideLines[0]).toContain("/repo (main) • test-session");
+      expect(wideStats.startsWith("17.4%/1.0M (auto) · 🔌 MCP: 1 server enabled")).toBe(true);
+      expect(wideStats).not.toContain("↑");
+      expect(wideStats).not.toContain("$0.117");
+      expect(wideStats.indexOf("🔌 MCP: 1 server enabled")).toBeLessThan(wideStats.indexOf("caveman level: FULL"));
+      expect(wideStats.indexOf("Copilot Enterprise 25%")).toBeLessThan(wideStats.indexOf("test-model"));
+      expect(wideStats.match(/17\.4%\/1\.0M/g)).toHaveLength(1);
 
       const mouse = (type: TuiMouseEvent["type"], x: number, y: number) =>
         ({ button: "left", type, x, y }) as TuiMouseEvent;
-      expect(component.handleMouse?.(mouse("press", contextX, 1))).toBeUndefined();
-      expect(component.handleMouse?.(mouse("release", contextX + 2, 1))).toBeUndefined();
-      component.handleMouse?.(mouse("click", contextX, 1));
-      component.handleMouse?.(mouse("click", usageX, 1));
+      const wideUsageX = visibleWidth(wideStats.slice(0, wideStats.indexOf("Copilot Enterprise")));
+      component.handleMouse?.(mouse("click", 0, 1));
+      component.handleMouse?.(mouse("click", wideUsageX, 1));
 
       const smallLines = component.render(80);
       expect(smallLines).toHaveLength(3);
-      expect(smallLines[1]?.trimStart()).toMatch(/^Copilot Enterprise/);
-      expect(smallLines[2]).toContain("50.0%/2.0k ·");
+      expect(smallLines[1]).toMatch(/^Copilot Enterprise 25% · test-model/);
+      expect(smallLines[2]).toContain("17.4%/1.0M (auto) · 🔌 MCP: 1 server enabled");
+      expect(smallLines[2]).toContain("...");
+      expect(smallLines.every((line: string) => visibleWidth(line) <= 80)).toBe(true);
+      const smallUsageX = visibleWidth(
+        (smallLines[1] ?? "").slice(0, (smallLines[1] ?? "").indexOf("Copilot Enterprise")),
+      );
       component.handleMouse?.(mouse("click", 0, 2));
-      component.handleMouse?.(mouse("click", 0, 1));
+      component.handleMouse?.(mouse("click", smallUsageX, 1));
+      const tinyLines = component.render(24);
+      expect(tinyLines).toHaveLength(3);
+      expect(tinyLines.every((line: string) => visibleWidth(line) <= 24 && line.includes("..."))).toBe(true);
 
       expect(emit).toHaveBeenNthCalledWith(1, OPEN_SESSION_USAGE_EVENT, undefined);
       expect(emit).toHaveBeenNthCalledWith(2, OPEN_COPILOT_USAGE_EVENT, undefined);
       expect(emit).toHaveBeenNthCalledWith(3, OPEN_SESSION_USAGE_EVENT, undefined);
       expect(emit).toHaveBeenNthCalledWith(4, OPEN_COPILOT_USAGE_EVENT, undefined);
-      component.dispose?.();
 
+      mcpTools.push({ namespace: { name: "mcp__second" }, exposure: "direct" });
+      expect(component.render(200)[1]).toContain("🔌 MCP: 2 servers enabled");
+      component.dispose?.();
       await dispatch("session_shutdown");
       expect(statuses.has(SESSION_USAGE_STATUS_KEY)).toBe(false);
       expect(statuses.has(COPILOT_USAGE_STATUS_KEY)).toBe(false);

@@ -16,7 +16,7 @@ npm run check
 
 ## Packages
 
-- [`pi-footer`](./packages/pi-footer) — one footer owner that combines session and Copilot usage.
+- [`pi-footer`](./packages/pi-footer) — responsive custom footer with Pi session context, Copilot usage, and extension statuses.
 - [`pi-session`](./packages/pi-session) — context indicator in Pi's default footer plus session details.
 - [`pi-usage`](./packages/pi-usage) — Copilot plan/percentage in Pi's default footer plus quota details.
 - [`pi-modal`](./packages/pi-modal) — shared modal UI library.

@@ -1,7 +1,7 @@
 {
   "name": "@marcosgilf/pi-footer",
   "version": "0.1.0",
-  "description": "One Pi footer that combines session and Copilot usage extensions.",
+  "description": "Responsive Pi footer for session context, Copilot usage, and extension statuses.",
   "type": "module",
   "license": "MIT",
   "private": false,
