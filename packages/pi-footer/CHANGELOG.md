@@ -1,5 +1,11 @@
 # @marcosgilf/pi-footer
 
+## 0.1.1
+
+### Patch Changes
+
+- e16ef44: Position session context and Pi extension statuses in the responsive custom footer.
+
 ## 0.1.0
 
 ### Minor Changes
