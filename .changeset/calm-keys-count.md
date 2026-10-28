@@ -2,4 +2,4 @@
 "@marcosgilf/pi-footer": patch
 ---
 
-Add native session stats and Pi extension statuses to the responsive custom footer.
+Position session context and Pi extension statuses in the responsive custom footer.

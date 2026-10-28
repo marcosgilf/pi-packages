@@ -25,21 +25,6 @@ describe("pi-footer", () => {
 
       const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => void>>();
       const statuses = new Map<string, string>();
-      const entries = [
-        {
-          type: "message",
-          message: {
-            role: "assistant",
-            usage: {
-              input: 192,
-              output: 37_000,
-              cacheRead: 7_700_000,
-              cacheWrite: 173_000,
-              cost: { total: 0.117 },
-            },
-          },
-        },
-      ];
       const mcpTools = [
         { namespace: { name: "mcp__chrome_devtools" }, exposure: "codemode" },
         { namespace: { name: "mcp__chrome_devtools" }, exposure: "codemode" },
@@ -78,12 +63,7 @@ describe("pi-footer", () => {
         },
         thinkingLevel: "off",
         getContextUsage: () => ({ percent: 17.4, tokens: 174_000, contextWindow: 1_000_000 }),
-        sessionManager: {
-          getEntries: () => entries,
-          getSessionId: () => "session",
-          getLeafId: () => "leaf",
-          getSessionName: () => "test-session",
-        },
+        sessionManager: { getSessionName: () => "test-session" },
         ui: { setFooter, setStatus },
       } as unknown as ExtensionContext;
       const dispatch = async (event: string) => {
@@ -94,6 +74,7 @@ describe("pi-footer", () => {
       await dispatch("session_start");
       await vi.waitFor(() => expect(statuses.get(COPILOT_USAGE_STATUS_KEY)).toBe("Copilot Enterprise 25%"));
       statuses.set("caveman", "caveman level: FULL");
+      statuses.set("ponytail", "○ 🐴 ponytail: ⚡ FULL");
       statuses.set("skill-test", "skill: test");
       expect(setFooter).toHaveBeenCalledOnce();
       expect(statuses.get(SESSION_USAGE_STATUS_KEY)).toBe("17.4%/1.0M");
@@ -125,9 +106,9 @@ describe("pi-footer", () => {
 
       expect(wideLines).toHaveLength(2);
       expect(wideLines[0]).toContain("/repo (main) • test-session");
-      expect(wideStats.startsWith("↑192 ↓37k R7.7M W173k CH")).toBe(true);
-      expect(wideStats).toContain("$0.117 (sub) 17.4%/1.0M (auto)");
-      expect(wideStats.indexOf("↑192")).toBeLessThan(wideStats.indexOf("🔌 MCP: 1 server enabled"));
+      expect(wideStats.startsWith("17.4%/1.0M (auto) · 🔌 MCP: 1 server enabled")).toBe(true);
+      expect(wideStats).not.toContain("↑");
+      expect(wideStats).not.toContain("$0.117");
       expect(wideStats.indexOf("🔌 MCP: 1 server enabled")).toBeLessThan(wideStats.indexOf("caveman level: FULL"));
       expect(wideStats.indexOf("Copilot Enterprise 25%")).toBeLessThan(wideStats.indexOf("test-model"));
       expect(wideStats.match(/17\.4%\/1\.0M/g)).toHaveLength(1);
@@ -140,9 +121,8 @@ describe("pi-footer", () => {
 
       const smallLines = component.render(80);
       expect(smallLines).toHaveLength(3);
-      expect(smallLines[1]?.trimStart()).toMatch(/^Copilot Enterprise 25% · test-model/);
-      expect(smallLines[2]).toContain("↑192 ↓37k R7.7M");
-      expect(smallLines[2]).toContain("🔌 MCP: 1 serv");
+      expect(smallLines[1]).toMatch(/^Copilot Enterprise 25% · test-model/);
+      expect(smallLines[2]).toContain("17.4%/1.0M (auto) · 🔌 MCP: 1 server enabled");
       expect(smallLines[2]).toContain("...");
       expect(smallLines.every((line: string) => visibleWidth(line) <= 80)).toBe(true);
       const smallUsageX = visibleWidth(
