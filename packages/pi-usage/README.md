@@ -23,3 +23,7 @@ gh auth refresh -h github.com -s user
 ```
 
 GitHub may change this endpoint.
+
+## Provider contract
+
+`UsageProvider`, `UsageSnapshot`, and `UsageWindow` types are exported from the package root for provider implementations. Identify quota windows by stable `limitId` or `durationMs`; do not assume provider-specific names such as `primary` or `secondary`. Timestamps use Unix milliseconds. Current extension runtime still reports Copilot usage only.

@@ -1,19 +1,18 @@
 import { execFile } from "node:child_process";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type ModalContent, type ModalRow, showModal } from "@marcosgilf/pi-modal";
-import { type CopilotUsage, formatPlanUsage, formatUsageSummary, getUsageProgress, parseCopilotUsage } from "./core.ts";
+import { formatPlanUsage, formatUsageSummary, getUsageProgress, parseCopilotUsage } from "./core.ts";
 import { COPILOT_USAGE_STATUS_KEY, OPEN_COPILOT_USAGE_EVENT } from "./events.ts";
+import type { UsageProvider, UsageSnapshot } from "./usage-provider.ts";
 
 const CACHE_MS = 5 * 60 * 1000;
-
-type UsageSnapshot = CopilotUsage & { fetchedAt: number };
 
 let cachedUsage: UsageSnapshot | undefined;
 let lastError: string | undefined;
 let lastAttempt = 0;
 let pending: Promise<UsageSnapshot> | undefined;
 
-function runGh(args: string[]): Promise<string> {
+function runGh(args: string[], signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "gh",
@@ -22,6 +21,7 @@ function runGh(args: string[]): Promise<string> {
         encoding: "utf8",
         timeout: 15_000,
         maxBuffer: 1024 * 1024,
+        signal,
       },
       (error, stdout, stderr) => {
         if (error) {
@@ -45,9 +45,12 @@ function runGh(args: string[]): Promise<string> {
   });
 }
 
-async function fetchCopilotUsage(): Promise<CopilotUsage> {
-  return parseCopilotUsage(JSON.parse(await runGh(["copilot_internal/user"])) as unknown);
-}
+const copilotUsageProvider: UsageProvider = {
+  id: "github-copilot",
+  async fetchUsage({ signal } = {}) {
+    return parseCopilotUsage(JSON.parse(await runGh(["copilot_internal/user"], signal)) as unknown);
+  },
+};
 
 async function refreshUsage(force = false): Promise<UsageSnapshot> {
   if (pending) return pending;
@@ -55,9 +58,10 @@ async function refreshUsage(force = false): Promise<UsageSnapshot> {
   if (!force && lastError && Date.now() - lastAttempt < CACHE_MS) throw new Error(lastError);
 
   lastAttempt = Date.now();
-  pending = fetchCopilotUsage()
+  pending = copilotUsageProvider
+    .fetchUsage()
     .then((usage) => {
-      cachedUsage = { ...usage, fetchedAt: Date.now() };
+      cachedUsage = usage;
       lastError = undefined;
       return cachedUsage;
     })
@@ -71,7 +75,7 @@ async function refreshUsage(force = false): Promise<UsageSnapshot> {
   return pending;
 }
 
-function buildCopilotUsageModal(usage: CopilotUsage): ModalContent {
+function buildCopilotUsageModal(usage: UsageSnapshot): ModalContent {
   const [title, planText, quotaText, resetText] = formatUsageSummary(usage);
   const progress = getUsageProgress(usage);
   const rows: ModalRow[] = [

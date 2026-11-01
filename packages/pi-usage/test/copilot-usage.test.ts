@@ -20,15 +20,24 @@ const enterpriseUsage = {
 
 describe("Copilot usage", () => {
   it("parses account quota, plan, and reset date", () => {
-    expect(parseCopilotUsage(enterpriseUsage)).toEqual({
+    expect(parseCopilotUsage(enterpriseUsage, 1_800_000_000_000)).toEqual({
+      providerId: "github-copilot",
+      authMethod: "github-cli",
       plan: "Copilot Enterprise",
-      unit: "AI credits",
-      used: 15192,
-      limit: 20000,
-      remaining: 4810.5,
-      percentUsed: 76,
-      resetAt: "2026-11-01T00:00:00.000Z",
-      unlimited: false,
+      windows: [
+        {
+          limitId: "premium_interactions",
+          unit: "AI credits",
+          used: 15192,
+          limit: 20000,
+          remaining: 4810.5,
+          usedPercent: 76,
+          resetsAt: Date.parse("2026-11-01T00:00:00.000Z"),
+          unlimited: false,
+        },
+      ],
+      fetchedAt: 1_800_000_000_000,
+      state: "available",
     });
   });
 
@@ -37,16 +46,16 @@ describe("Copilot usage", () => {
       copilot_plan: "pro",
       quota_snapshots: { premium_interactions: { percent_remaining: 80, entitlement: 300, quota_remaining: 240 } },
     });
-    expect(legacy.unit).toBe("premium requests");
-    expect(legacy.percentUsed).toBe(20);
+    expect(legacy.windows[0]?.unit).toBe("premium requests");
+    expect(legacy.windows[0]?.usedPercent).toBe(20);
     expect(legacy.plan).toBe("Copilot Pro");
 
     const unlimited = parseCopilotUsage({
       copilot_plan: "enterprise",
       quota_snapshots: { premium_interactions: { unlimited: true, has_quota: false } },
     });
-    expect(unlimited.unlimited).toBe(true);
-    expect(unlimited.percentUsed).toBeUndefined();
+    expect(unlimited.windows[0]?.unlimited).toBe(true);
+    expect(unlimited.windows[0]?.usedPercent).toBeUndefined();
     expect(getUsageProgress(unlimited)).toBeUndefined();
   });
 
