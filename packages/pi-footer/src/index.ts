@@ -4,7 +4,12 @@ import registerSession from "@marcosgilf/pi-session";
 import { getContextUsageStyle } from "@marcosgilf/pi-session/core";
 import { OPEN_SESSION_USAGE_EVENT, SESSION_USAGE_STATUS_KEY } from "@marcosgilf/pi-session/events";
 import registerUsage from "@marcosgilf/pi-usage";
-import { COPILOT_USAGE_STATUS_KEY, OPEN_COPILOT_USAGE_EVENT } from "@marcosgilf/pi-usage/events";
+import {
+  COPILOT_USAGE_STATUS_KEY,
+  OPEN_COPILOT_USAGE_EVENT,
+  OPEN_OPENAI_USAGE_EVENT,
+  OPENAI_USAGE_STATUS_KEY,
+} from "@marcosgilf/pi-usage/events";
 
 type ClickBounds = { left: number; right: number };
 
@@ -40,7 +45,7 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
     };
     const unsubscribe = footerData.onBranchChange(requestRender);
     let sessionClickBounds: ClickBounds | undefined;
-    let usageClickBounds: ClickBounds | undefined;
+    let usageClickBounds: { bounds: ClickBounds; event: string }[] = [];
     let sessionClickRow = 1;
 
     return {
@@ -56,12 +61,12 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
           event.x >= sessionClickBounds.left &&
           event.x < sessionClickBounds.right;
         const clickedUsage =
-          event.y === 1 &&
-          usageClickBounds !== undefined &&
-          event.x >= usageClickBounds.left &&
-          event.x < usageClickBounds.right;
-        if (!clickedSession && !clickedUsage) return;
-        pi.events.emit(clickedSession ? OPEN_SESSION_USAGE_EVENT : OPEN_COPILOT_USAGE_EVENT, undefined);
+          event.y === 1
+            ? usageClickBounds.find(({ bounds }) => event.x >= bounds.left && event.x < bounds.right)?.event
+            : undefined;
+        if (clickedSession) pi.events.emit(OPEN_SESSION_USAGE_EVENT, undefined);
+        else if (clickedUsage) pi.events.emit(clickedUsage, undefined);
+        else return;
         return { handled: true, render: true };
       },
       invalidate() {},
@@ -77,7 +82,10 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
             )
           : "";
         const otherStatuses = Array.from(statuses.entries())
-          .filter(([key]) => key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY)
+          .filter(
+            ([key]) =>
+              key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY && key !== OPENAI_USAGE_STATUS_KEY,
+          )
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, text]) => sanitizeStatus(text));
         const left = [sessionText, getMcpStatus(pi), otherStatuses.join(" ")].filter(Boolean).join(" · ");
@@ -89,11 +97,14 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
             ? " • thinking off"
             : ` • thinking ${ctx.thinkingLevel || "off"}`
           : "";
-        let modelText = `${modelName}${thinking}`;
-        if (footerData.getAvailableProviderCount() > 1 && model) modelText = `(${model.provider}) ${modelText}`;
-        const usageText = statuses.get(COPILOT_USAGE_STATUS_KEY) ?? "";
-        const usageLabel = usageText ? theme.fg(usageStyle(usageText), usageText) : "";
-        const right = [usageLabel, theme.fg("dim", modelText)].filter(Boolean).join(" · ");
+        const modelText = `${modelName}${thinking}`;
+        const usageLabels = [
+          { text: statuses.get(COPILOT_USAGE_STATUS_KEY) ?? "", event: OPEN_COPILOT_USAGE_EVENT },
+          { text: statuses.get(OPENAI_USAGE_STATUS_KEY) ?? "", event: OPEN_OPENAI_USAGE_EVENT },
+        ]
+          .filter(({ text }) => text)
+          .map(({ text, event }) => ({ text: theme.fg(usageStyle(text), text), event }));
+        const right = [...usageLabels.map(({ text }) => text), theme.fg("dim", modelText)].filter(Boolean).join(" · ");
         const clippedRight = truncateToWidth(right, width, theme.fg("dim", "..."));
         const rightWidth = visibleWidth(clippedRight);
 
@@ -112,11 +123,11 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
 
         const ellipsis = theme.fg("dim", "...");
         const rightLeft = width - rightWidth;
-        let usageLeft = 0;
+        let rightStart = 0;
         let sessionLine = "";
         sessionClickRow = 1;
         if (left && right && visibleWidth(left) + rightWidth + 2 <= width) {
-          usageLeft = rightLeft;
+          rightStart = rightLeft;
           sessionLine = truncateToWidth(left, width - rightWidth - 2, ellipsis);
           const spaces = Math.max(2, rightLeft - visibleWidth(sessionLine));
           lines.push(`${sessionLine}${" ".repeat(spaces)}${clippedRight}`);
@@ -134,10 +145,12 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
 
         const sessionWidth = Math.min(visibleWidth(sessionText), visibleWidth(sessionLine));
         sessionClickBounds = sessionWidth > 0 ? { left: 0, right: sessionWidth } : undefined;
-        usageClickBounds =
-          usageLabel && right
-            ? { left: usageLeft, right: usageLeft + Math.min(visibleWidth(usageLabel), rightWidth) }
-            : undefined;
+        usageClickBounds = usageLabels.flatMap(({ text, event }) => {
+          const index = clippedRight.indexOf(text);
+          if (index < 0) return [];
+          const left = rightStart + visibleWidth(clippedRight.slice(0, index));
+          return [{ bounds: { left, right: left + visibleWidth(text) }, event }];
+        });
 
         return lines;
       },

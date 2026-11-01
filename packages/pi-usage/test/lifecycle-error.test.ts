@@ -5,7 +5,10 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("pi-usage stale errors", () => {
   it("does not notify after quota fetch fails after session shutdown", async () => {
@@ -13,17 +16,19 @@ describe("pi-usage stale errors", () => {
     try {
       await writeFile(
         join(directory, "gh"),
-        "#!/bin/sh\nsleep 0.15\nprintf '%s\\n' 'authentication required' >&2\nexit 1\n",
-        { mode: 0o755 },
+        "#!/bin/sh\nsleep 0.15\nprintf 'authentication required\\n' >&2\nexit 1\n",
+        {
+          mode: 0o755,
+        },
       );
       vi.stubEnv("PATH", `${directory}:${process.env.PATH ?? ""}`);
 
-      const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => void>();
+      const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => void>>();
       let copilotCommand: ((args: string, ctx: ExtensionContext) => Promise<void> | void) | undefined;
       const notify = vi.fn();
       const pi = {
         on: (event: string, handler: (event: unknown, ctx: ExtensionContext) => void) => {
-          handlers.set(event, handler);
+          handlers.set(event, [...(handlers.get(event) ?? []), handler]);
           return vi.fn();
         },
         events: { on: vi.fn(() => vi.fn()), emit: vi.fn() },
@@ -34,14 +39,19 @@ describe("pi-usage stale errors", () => {
       } as unknown as ExtensionAPI;
       const ctx = {
         mode: "tui",
+        model: { id: "copilot-model", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com" },
+        modelRegistry: {
+          isUsingOAuth: () => false,
+          getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "github-token" }),
+        },
         ui: { setStatus: vi.fn(), notify, custom: vi.fn() },
       } as unknown as ExtensionContext;
 
       extension(pi);
-      handlers.get("session_start")?.({}, ctx);
+      for (const handler of handlers.get("session_start") ?? []) handler({}, ctx);
       const command = copilotCommand?.("", ctx);
       if (!command) throw new Error("Copilot command was not registered");
-      handlers.get("session_shutdown")?.({}, ctx);
+      for (const handler of handlers.get("session_shutdown") ?? []) handler({}, ctx);
       await command;
 
       expect(notify).not.toHaveBeenCalled();

@@ -1,7 +1,7 @@
 {
   "name": "@marcosgilf/pi-usage",
   "version": "0.3.0",
-  "description": "Show GitHub Copilot plan and quota usage in Pi.",
+  "description": "Show local provider and quota status in Pi.",
   "type": "module",
   "license": "MIT",
   "private": false,
@@ -11,6 +11,8 @@
     "pi",
     "usage",
     "quota",
+    "ai-provider",
+    "openai",
     "github-copilot",
     "copilot"
   ],
