@@ -1,13 +1,4 @@
-export type CopilotUsage = {
-  plan: string;
-  unit: "AI credits" | "premium requests";
-  used?: number;
-  limit?: number;
-  remaining?: number;
-  percentUsed?: number;
-  resetAt?: string;
-  unlimited: boolean;
-};
+import type { UsageSnapshot, UsageWindow } from "./usage-provider.ts";
 
 const planNames: Record<string, string> = {
   business: "Copilot Business",
@@ -23,7 +14,7 @@ function numberOrUndefined(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-export function parseCopilotUsage(data: unknown): CopilotUsage {
+export function parseCopilotUsage(data: unknown, fetchedAt = Date.now()): UsageSnapshot {
   if (!data || typeof data !== "object") throw new Error("GitHub returned invalid Copilot usage data.");
   const account = data as {
     copilot_plan?: unknown;
@@ -71,38 +62,53 @@ export function parseCopilotUsage(data: unknown): CopilotUsage {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "");
   const tokenBased = snapshot.token_based_billing === true || account.token_based_billing === true;
-  return {
-    plan: planNames[planKey] ?? `Copilot ${rawPlan}`,
+  const resetAt = typeof account.quota_reset_date_utc === "string" ? Date.parse(account.quota_reset_date_utc) : NaN;
+  const window: UsageWindow = {
+    limitId: "premium_interactions",
     unit: tokenBased ? "AI credits" : "premium requests",
     used,
     limit,
     remaining,
-    percentUsed,
-    resetAt: typeof account.quota_reset_date_utc === "string" ? account.quota_reset_date_utc : undefined,
+    usedPercent: percentUsed,
+    resetsAt: Number.isFinite(resetAt) ? resetAt : undefined,
     unlimited: snapshot.unlimited === true || snapshot.has_quota === false,
+  };
+  return {
+    providerId: "github-copilot",
+    authMethod: "github-cli",
+    plan: planNames[planKey] ?? `Copilot ${rawPlan}`,
+    windows: [window],
+    fetchedAt,
+    state: "available",
   };
 }
 
-export function formatPlanUsage(usage?: CopilotUsage): string {
+export function formatPlanUsage(usage?: UsageSnapshot): string {
   if (!usage) return "";
-  return usage.unlimited ? `${usage.plan} ∞` : `${usage.plan} ${usage.percentUsed ?? 0}%`;
+  const window = usage.windows[0];
+  const plan = usage.plan ?? "unknown";
+  return window?.unlimited ? `${plan} ∞` : `${plan} ${window?.usedPercent ?? 0}%`;
 }
 
 export function formatCredits(value: number | undefined): string {
   return value === undefined ? "—" : value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
-export function formatUsageSummary(usage: CopilotUsage): [string, string, string, string] {
-  const percent = usage.percentUsed ?? 0;
-  const quota = usage.unlimited
-    ? `${usage.unit}: unlimited`
-    : `${usage.unit} (resets monthly): ${formatCredits(usage.used)} / ${formatCredits(usage.limit)} (${percent}% used)`;
-  const reset = usage.resetAt
-    ? `Resets: ${new Date(usage.resetAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} UTC`
-    : "Resets monthly";
-  return ["Copilot usage and plan", `Plan: ${usage.plan}`, quota, reset];
+export function formatUsageSummary(usage: UsageSnapshot): [string, string, string, string] {
+  const window = usage.windows[0];
+  const percent = window?.usedPercent ?? 0;
+  const unit = window?.unit ?? "usage";
+  const quota = window?.unlimited
+    ? `${unit}: unlimited`
+    : `${unit} (resets monthly): ${formatCredits(window?.used)} / ${formatCredits(window?.limit)} (${percent}% used)`;
+  const reset =
+    window?.resetsAt !== undefined
+      ? `Resets: ${new Date(window.resetsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} UTC`
+      : "Resets monthly";
+  return ["Copilot usage and plan", `Plan: ${usage.plan ?? "unknown"}`, quota, reset];
 }
 
-export function getUsageProgress(usage: CopilotUsage): number | undefined {
-  return usage.unlimited ? undefined : (usage.percentUsed ?? 0);
+export function getUsageProgress(usage: UsageSnapshot): number | undefined {
+  const window = usage.windows[0];
+  return window?.unlimited ? undefined : (window?.usedPercent ?? 0);
 }
