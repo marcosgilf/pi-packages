@@ -1,5 +1,11 @@
 # @marcosgilf/pi-usage
 
+## 0.3.0
+
+### Minor Changes
+
+- 143aa66: Export provider-neutral usage snapshot and provider types.
+
 ## 0.2.0
 
 ### Minor Changes

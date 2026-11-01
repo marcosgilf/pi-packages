@@ -1,5 +1,12 @@
 # @marcosgilf/pi-footer
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [143aa66]
+  - @marcosgilf/pi-usage@0.3.0
+
 ## 0.1.1
 
 ### Patch Changes
