@@ -1,5 +1,11 @@
 # @marcosgilf/pi-usage
 
+## 0.4.0
+
+### Minor Changes
+
+- ff57d87: Show active GitHub Copilot quota and local OpenAI provider/auth status. OpenAI subscription quota remains unavailable.
+
 ## 0.3.0
 
 ### Minor Changes
