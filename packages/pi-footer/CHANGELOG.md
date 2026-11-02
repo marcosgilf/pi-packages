@@ -1,5 +1,13 @@
 # @marcosgilf/pi-footer
 
+## 0.1.3
+
+### Patch Changes
+
+- ff57d87: Show active GitHub Copilot quota and local OpenAI provider/auth status. OpenAI subscription quota remains unavailable.
+- Updated dependencies [ff57d87]
+  - @marcosgilf/pi-usage@0.4.0
+
 ## 0.1.2
 
 ### Patch Changes
