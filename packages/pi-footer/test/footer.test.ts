@@ -6,7 +6,9 @@ import {
   COPILOT_USAGE_STATUS_KEY,
   OPEN_COPILOT_USAGE_EVENT,
   OPEN_OPENAI_USAGE_EVENT,
+  OPEN_OPENROUTER_USAGE_EVENT,
   OPENAI_USAGE_STATUS_KEY,
+  OPENROUTER_USAGE_STATUS_KEY,
 } from "@marcosgilf/pi-usage/events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
@@ -144,6 +146,15 @@ describe("pi-footer", () => {
     component.handleMouse?.(mouse("click", copilotUsageX, 1));
     expect(emit).toHaveBeenNthCalledWith(5, OPEN_COPILOT_USAGE_EVENT, undefined);
     statuses.delete(COPILOT_USAGE_STATUS_KEY);
+    const openAiStatus = statuses.get(OPENAI_USAGE_STATUS_KEY);
+    statuses.delete(OPENAI_USAGE_STATUS_KEY);
+    statuses.set(OPENROUTER_USAGE_STATUS_KEY, "OpenRouter $25.50/month");
+    const openRouterStats = component.render(120)[1] ?? "";
+    const openRouterUsageX = visibleWidth(openRouterStats.slice(0, openRouterStats.indexOf("OpenRouter $25.50")));
+    component.handleMouse?.(mouse("click", openRouterUsageX, 1));
+    expect(emit).toHaveBeenNthCalledWith(6, OPEN_OPENROUTER_USAGE_EVENT, undefined);
+    statuses.delete(OPENROUTER_USAGE_STATUS_KEY);
+    if (openAiStatus) statuses.set(OPENAI_USAGE_STATUS_KEY, openAiStatus);
     vi.stubEnv("OPENAI_ADMIN_KEY", "");
     const localStatusStats = component.render(160)[1] ?? "";
     expect(localStatusStats).toContain("OpenAI ChatGPT · quota unavailable");

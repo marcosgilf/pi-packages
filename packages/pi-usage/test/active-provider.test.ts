@@ -3,7 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COPILOT_USAGE_STATUS_KEY, OPEN_OPENAI_USAGE_EVENT, OPENAI_USAGE_STATUS_KEY } from "../src/events.ts";
+import {
+  COPILOT_USAGE_STATUS_KEY,
+  OPEN_OPENAI_USAGE_EVENT,
+  OPEN_OPENROUTER_USAGE_EVENT,
+  OPENAI_USAGE_STATUS_KEY,
+  OPENROUTER_USAGE_STATUS_KEY,
+} from "../src/events.ts";
 import extension from "../src/index.ts";
 
 afterEach(() => {
@@ -21,7 +27,10 @@ describe("active provider usage", () => {
         { mode: 0o755 },
       );
       vi.stubEnv("PATH", `${directory}:${process.env.PATH ?? ""}`);
-      const fetch = vi.fn();
+      const fetch = vi.fn(
+        async (_input: RequestInfo | URL, _init?: RequestInit) =>
+          new Response(JSON.stringify({ data: { usage_monthly: 25.5 } }), { status: 200 }),
+      );
       vi.stubGlobal("fetch", fetch);
 
       const copilotModel = {
@@ -34,6 +43,12 @@ describe("active provider usage", () => {
         id: "gpt-6-luna",
         provider: "openai",
         baseUrl: "https://api.openai.com/v1",
+        reasoning: true,
+      };
+      const openrouterModel = {
+        id: "openai/gpt-4.1",
+        provider: "openrouter",
+        baseUrl: "https://openrouter.ai/api/v1",
         reasoning: true,
       };
       let openaiOAuth = true;
@@ -66,7 +81,9 @@ describe("active provider usage", () => {
         ui: { setStatus, notify: vi.fn() },
         modelRegistry: {
           hasConfiguredAuth: () => true,
-          isUsingOAuth: (model: { provider: string }) => model.provider === "openai" && openaiOAuth,
+          isUsingOAuth: (model: { provider: string }) =>
+            model.provider === "openrouter" || (model.provider === "openai" && openaiOAuth),
+          getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test-openrouter-key" }),
         },
       } as unknown as ExtensionContext;
       const dispatch = (name: string, event: unknown = {}) => {
@@ -86,6 +103,7 @@ describe("active provider usage", () => {
 
       expect(commands.get("usage")?.description).toContain("active provider");
       expect(commands.get("openai-usage")?.description).toContain("authentication status");
+      expect(commands.get("openrouter-usage")?.description).toContain("OpenRouter");
       await commands.get("usage")?.handler("", ctx);
       expect(emit).toHaveBeenCalledWith(OPEN_OPENAI_USAGE_EVENT, undefined);
 
@@ -94,8 +112,18 @@ describe("active provider usage", () => {
       await vi.waitFor(() =>
         expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI API key · subscription quota unavailable"),
       );
+
+      (ctx as unknown as { model: typeof openrouterModel }).model = openrouterModel;
+      dispatch("model_select", { model: openrouterModel, previousModel: openaiModel, source: "set" });
+      await vi.waitFor(() => expect(statuses.get(OPENROUTER_USAGE_STATUS_KEY)).toBe("OpenRouter $25.50/month"));
+      expect(statuses.has(OPENAI_USAGE_STATUS_KEY)).toBe(false);
+      expect(fetch).toHaveBeenCalledOnce();
+      await commands.get("usage")?.handler("", ctx);
+      expect(emit).toHaveBeenNthCalledWith(2, OPEN_OPENROUTER_USAGE_EVENT, undefined);
+
       for (const handler of handlers.get("session_shutdown") ?? []) handler({}, ctx);
       expect(statuses.has(OPENAI_USAGE_STATUS_KEY)).toBe(false);
+      expect(statuses.has(OPENROUTER_USAGE_STATUS_KEY)).toBe(false);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

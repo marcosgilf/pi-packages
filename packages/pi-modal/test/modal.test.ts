@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { KeybindingsManager, TUI, TuiMouseEvent } from "@earendil-works/pi-tui";
+import { type KeybindingsManager, type TUI, type TuiMouseEvent, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import { createModalComponent, formatProgressBar, type ModalContent, writeClipboard } from "../src/index.ts";
 
@@ -114,6 +114,23 @@ describe("shared modal", () => {
       expect(rendered).toContain("██");
       component.dispose();
     }
+  });
+
+  it("wraps a long text row instead of cutting its end", () => {
+    const line = "Key spend and budgets are not subscription quota or account credit balance.";
+    const component = createModalComponent(
+      createTui(),
+      theme,
+      keybindings,
+      vi.fn(),
+      { rows: [{ text: line }], clipboardText: line },
+      { refresh: async () => ({ rows: [], clipboardText: "" }) },
+    );
+    const rendered = component.render(80).join("\n");
+
+    expect(rendered).not.toContain("…");
+    expect(rendered.replace(/[│╭╮╰╯─]/g, "").replace(/\s+/g, " ")).toContain(line);
+    expect(component.render(80).every((row) => visibleWidth(row) <= 80)).toBe(true);
   });
 
   it("copies the active TUI selection with Command+C", async () => {

@@ -59,6 +59,7 @@ describe("pi-usage extension", () => {
       expect(commands.get("usage")?.description).toContain("active provider");
       expect(commands.get("copilot-usage")?.description).toContain("GitHub Copilot");
       expect(commands.get("openai-usage")?.description).toContain("OpenAI");
+      expect(commands.get("openrouter-usage")?.description).toContain("OpenRouter");
       await commands.get("usage")?.handler("", ctx);
       expect(emit).toHaveBeenCalledWith(OPEN_COPILOT_USAGE_EVENT, undefined);
       expect(registerShortcut).toHaveBeenCalledWith(

@@ -8,7 +8,9 @@ import {
   COPILOT_USAGE_STATUS_KEY,
   OPEN_COPILOT_USAGE_EVENT,
   OPEN_OPENAI_USAGE_EVENT,
+  OPEN_OPENROUTER_USAGE_EVENT,
   OPENAI_USAGE_STATUS_KEY,
+  OPENROUTER_USAGE_STATUS_KEY,
 } from "@marcosgilf/pi-usage/events";
 
 type ClickBounds = { left: number; right: number };
@@ -84,7 +86,10 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
         const otherStatuses = Array.from(statuses.entries())
           .filter(
             ([key]) =>
-              key !== SESSION_USAGE_STATUS_KEY && key !== COPILOT_USAGE_STATUS_KEY && key !== OPENAI_USAGE_STATUS_KEY,
+              key !== SESSION_USAGE_STATUS_KEY &&
+              key !== COPILOT_USAGE_STATUS_KEY &&
+              key !== OPENAI_USAGE_STATUS_KEY &&
+              key !== OPENROUTER_USAGE_STATUS_KEY,
           )
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, text]) => sanitizeStatus(text));
@@ -101,6 +106,7 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
         const usageLabels = [
           { text: statuses.get(COPILOT_USAGE_STATUS_KEY) ?? "", event: OPEN_COPILOT_USAGE_EVENT },
           { text: statuses.get(OPENAI_USAGE_STATUS_KEY) ?? "", event: OPEN_OPENAI_USAGE_EVENT },
+          { text: statuses.get(OPENROUTER_USAGE_STATUS_KEY) ?? "", event: OPEN_OPENROUTER_USAGE_EVENT },
         ]
           .filter(({ text }) => text)
           .map(({ text, event }) => ({ text: theme.fg(usageStyle(text), text), event }));
