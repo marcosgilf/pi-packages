@@ -1,7 +1,7 @@
 {
   "name": "@marcosgilf/pi-usage",
   "version": "0.4.0",
-  "description": "Show local provider and quota status in Pi.",
+  "description": "Show active provider usage and authentication status in Pi.",
   "type": "module",
   "license": "MIT",
   "private": false,
@@ -14,7 +14,8 @@
     "ai-provider",
     "openai",
     "github-copilot",
-    "copilot"
+    "copilot",
+    "openrouter"
   ],
   "files": [
     "src",

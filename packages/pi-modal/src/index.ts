@@ -32,6 +32,23 @@ export function formatProgressBar(percent: number, width: number): string {
   return `${"█".repeat(filled)}${"░".repeat(cells - filled)}`;
 }
 
+// Wrap at spaces so a long summary line stays readable instead of losing its end.
+function wrapText(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let current = "";
+  for (const word of text.split(" ")) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (visibleWidth(candidate) <= width) {
+      current = candidate;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = word;
+  }
+  lines.push(current);
+  return lines;
+}
+
 function borderedRows(rows: ModalRow[], width: number, theme: Theme): string[] {
   if (width < 6) {
     return rows.map(({ text, progress }) =>
@@ -42,12 +59,14 @@ function borderedRows(rows: ModalRow[], width: number, theme: Theme): string[] {
   const edge = theme.fg("muted", "│");
   const top = theme.fg("muted", `╭${"─".repeat(contentWidth + 2)}╮`);
   const bottom = theme.fg("muted", `╰${"─".repeat(contentWidth + 2)}╯`);
-  const content = rows.map(({ text, style, progress }) => {
-    const value = progress === undefined ? text : formatProgressBar(progress, contentWidth);
-    const styled = style === "accent" ? theme.fg(style, theme.bold(value)) : style ? theme.fg(style, value) : value;
-    const clipped = truncateToWidth(styled, contentWidth, "…");
-    const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(clipped)));
-    return `${edge}${theme.bg("selectedBg", ` ${clipped}${padding} `)}${edge}`;
+  const content = rows.flatMap(({ text, style, progress }) => {
+    const values = progress === undefined ? wrapText(text, contentWidth) : [formatProgressBar(progress, contentWidth)];
+    return values.map((value) => {
+      const styled = style === "accent" ? theme.fg(style, theme.bold(value)) : style ? theme.fg(style, value) : value;
+      const clipped = truncateToWidth(styled, contentWidth, "…");
+      const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(clipped)));
+      return `${edge}${theme.bg("selectedBg", ` ${clipped}${padding} `)}${edge}`;
+    });
   });
   return [top, ...content, bottom];
 }
