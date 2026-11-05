@@ -1,5 +1,16 @@
 # @marcosgilf/pi-usage
 
+## 0.5.0
+
+### Minor Changes
+
+- 66163b6: Add OpenRouter key usage, budgets, and free-model request allowance to `/usage` and the footer.
+
+### Patch Changes
+
+- Updated dependencies [66163b6]
+  - @marcosgilf/pi-modal@0.1.1
+
 ## 0.4.0
 
 ### Minor Changes

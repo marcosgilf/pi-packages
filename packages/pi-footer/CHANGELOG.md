@@ -1,5 +1,13 @@
 # @marcosgilf/pi-footer
 
+## 0.1.4
+
+### Patch Changes
+
+- 66163b6: Add OpenRouter key usage, budgets, and free-model request allowance to `/usage` and the footer.
+- Updated dependencies [66163b6]
+  - @marcosgilf/pi-usage@0.5.0
+
 ## 0.1.3
 
 ### Patch Changes
