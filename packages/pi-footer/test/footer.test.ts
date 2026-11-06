@@ -74,7 +74,7 @@ describe("pi-footer", () => {
 
     extension(pi);
     await dispatch("session_start");
-    await vi.waitFor(() => expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI ChatGPT · quota unavailable"));
+    await vi.waitFor(() => expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI ChatGPT"));
     statuses.set("caveman", "caveman level: FULL");
     statuses.set("ponytail", "○ 🐴 ponytail: ⚡ FULL");
     statuses.set("skill-test", "skill: test");
@@ -109,7 +109,7 @@ describe("pi-footer", () => {
     expect(wideLines).toHaveLength(2);
     expect(wideLines[0]).toContain("/repo (main) • test-session");
     expect(wideStats.startsWith("17.4%/1.0M (auto) · 🔌 MCP: 1 server enabled")).toBe(true);
-    expect(wideStats).toContain("OpenAI ChatGPT · quota unavailable · gpt-6-luna • thinking xhigh");
+    expect(wideStats).toContain("OpenAI ChatGPT · gpt-6-luna • thinking xhigh");
     expect(wideStats).not.toContain("(openai)");
     expect(wideStats).not.toContain("↑");
     expect(wideStats).not.toContain("API $");
@@ -124,7 +124,7 @@ describe("pi-footer", () => {
 
     const smallLines = component.render(80);
     expect(smallLines).toHaveLength(3);
-    expect(smallLines[1]).toMatch(/^OpenAI ChatGPT · quota unavailable · gpt-6-luna • thinking xhigh/);
+    expect(smallLines[1]).toMatch(/^OpenAI ChatGPT · gpt-6-luna • thinking xhigh/);
     expect(smallLines[2]).toContain("17.4%/1.0M (auto) · 🔌 MCP: 1 server enabled");
     expect(smallLines[2]).toContain("...");
     expect(smallLines.every((line: string) => visibleWidth(line) <= 80)).toBe(true);
@@ -157,7 +157,7 @@ describe("pi-footer", () => {
     if (openAiStatus) statuses.set(OPENAI_USAGE_STATUS_KEY, openAiStatus);
     vi.stubEnv("OPENAI_ADMIN_KEY", "");
     const localStatusStats = component.render(160)[1] ?? "";
-    expect(localStatusStats).toContain("OpenAI ChatGPT · quota unavailable");
+    expect(localStatusStats).toContain("OpenAI ChatGPT");
     expect(localStatusStats).toContain("gpt-6-luna • thinking xhigh");
     expect(localStatusStats).not.toContain("(openai)");
     expect(fetch).not.toHaveBeenCalled();

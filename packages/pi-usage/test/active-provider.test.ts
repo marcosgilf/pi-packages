@@ -97,7 +97,7 @@ describe("active provider usage", () => {
 
       (ctx as { model: typeof openaiModel }).model = openaiModel;
       dispatch("model_select", { model: openaiModel, previousModel: copilotModel, source: "set" });
-      await vi.waitFor(() => expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI ChatGPT · quota unavailable"));
+      await vi.waitFor(() => expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI ChatGPT"));
       expect(statuses.has(COPILOT_USAGE_STATUS_KEY)).toBe(false);
       expect(fetch).not.toHaveBeenCalled();
 
@@ -109,9 +109,7 @@ describe("active provider usage", () => {
 
       openaiOAuth = false;
       dispatch("agent_end");
-      await vi.waitFor(() =>
-        expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI API key · subscription quota unavailable"),
-      );
+      await vi.waitFor(() => expect(statuses.get(OPENAI_USAGE_STATUS_KEY)).toBe("OpenAI API key"));
 
       (ctx as unknown as { model: typeof openrouterModel }).model = openrouterModel;
       dispatch("model_select", { model: openrouterModel, previousModel: openaiModel, source: "set" });

@@ -34,13 +34,24 @@ export function createOpenAIUsageProvider(ctx: ExtensionContext): UsageProvider 
 }
 
 export function formatOpenAIUsageStatus(usage: UsageSnapshot): string {
+  const base =
+    usage.authMethod === "chatgpt-oauth"
+      ? "OpenAI ChatGPT"
+      : usage.authMethod === "api-key"
+        ? "OpenAI API key"
+        : "OpenAI";
+  if (
+    (usage.authMethod === "chatgpt-oauth" || usage.authMethod === "api-key") &&
+    (usage.state === "unavailable" || usage.state === "unsupported")
+  )
+    return base;
   switch (usage.authMethod) {
     case "chatgpt-oauth":
-      return "OpenAI ChatGPT · quota unavailable";
+      return `${base} · quota unavailable`;
     case "api-key":
-      return "OpenAI API key · subscription quota unavailable";
+      return `${base} · subscription quota unavailable`;
     default:
-      return "OpenAI · auth not configured";
+      return `${base} · auth not configured`;
   }
 }
 
