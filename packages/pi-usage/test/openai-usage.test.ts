@@ -37,7 +37,7 @@ describe("OpenAI local provider status", () => {
       state: "unsupported",
     });
     expect(snapshot).not.toHaveProperty("accountId");
-    expect(formatOpenAIUsageStatus(snapshot)).toBe("OpenAI ChatGPT · quota unavailable");
+    expect(formatOpenAIUsageStatus(snapshot)).toBe("OpenAI ChatGPT");
     expect(formatOpenAIUsageSummary(snapshot)).toEqual([
       "OpenAI provider status",
       "Authentication: Sign in with ChatGPT",
@@ -53,7 +53,7 @@ describe("OpenAI local provider status", () => {
 
     expect(snapshot.authMethod).toBe("api-key");
     expect(snapshot.state).toBe("unsupported");
-    expect(formatOpenAIUsageStatus(snapshot)).toBe("OpenAI API key · subscription quota unavailable");
+    expect(formatOpenAIUsageStatus(snapshot)).toBe("OpenAI API key");
     expect(formatOpenAIUsageSummary(snapshot)[1]).toBe("Authentication: OpenAI API key");
   });
 
