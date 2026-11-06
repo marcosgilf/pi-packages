@@ -1,6 +1,6 @@
 {
   "name": "@marcosgilf/pi-usage",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Show active provider usage and authentication status in Pi.",
   "type": "module",
   "license": "MIT",
