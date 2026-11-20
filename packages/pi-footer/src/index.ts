@@ -91,7 +91,8 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
               key !== SESSION_USAGE_STATUS_KEY &&
               key !== COPILOT_USAGE_STATUS_KEY &&
               key !== OPENAI_USAGE_STATUS_KEY &&
-              key !== OPENROUTER_USAGE_STATUS_KEY,
+              key !== OPENROUTER_USAGE_STATUS_KEY &&
+              key !== RADIUS_USAGE_STATUS_KEY,
           )
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, text]) => sanitizeStatus(text));
