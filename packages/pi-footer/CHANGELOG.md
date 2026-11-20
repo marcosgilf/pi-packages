@@ -1,5 +1,11 @@
 # @marcosgilf/pi-footer
 
+## 0.1.7
+
+### Patch Changes
+
+- 91bf8b1: Fix Radius usage status rendering twice in the footer: exclude it from the generic status list now that it has a dedicated usage label.
+
 ## 0.1.6
 
 ### Patch Changes
