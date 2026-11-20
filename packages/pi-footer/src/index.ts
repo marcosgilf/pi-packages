@@ -9,8 +9,10 @@ import {
   OPEN_COPILOT_USAGE_EVENT,
   OPEN_OPENAI_USAGE_EVENT,
   OPEN_OPENROUTER_USAGE_EVENT,
+  OPEN_RADIUS_USAGE_EVENT,
   OPENAI_USAGE_STATUS_KEY,
   OPENROUTER_USAGE_STATUS_KEY,
+  RADIUS_USAGE_STATUS_KEY,
 } from "@marcosgilf/pi-usage/events";
 
 type ClickBounds = { left: number; right: number };
@@ -107,6 +109,7 @@ function addCustomFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
           { text: statuses.get(COPILOT_USAGE_STATUS_KEY) ?? "", event: OPEN_COPILOT_USAGE_EVENT },
           { text: statuses.get(OPENAI_USAGE_STATUS_KEY) ?? "", event: OPEN_OPENAI_USAGE_EVENT },
           { text: statuses.get(OPENROUTER_USAGE_STATUS_KEY) ?? "", event: OPEN_OPENROUTER_USAGE_EVENT },
+          { text: statuses.get(RADIUS_USAGE_STATUS_KEY) ?? "", event: OPEN_RADIUS_USAGE_EVENT },
         ]
           .filter(({ text }) => text)
           .map(({ text, event }) => ({ text: theme.fg(usageStyle(text), text), event }));
