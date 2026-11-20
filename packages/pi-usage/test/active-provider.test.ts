@@ -7,8 +7,10 @@ import {
   COPILOT_USAGE_STATUS_KEY,
   OPEN_OPENAI_USAGE_EVENT,
   OPEN_OPENROUTER_USAGE_EVENT,
+  OPEN_RADIUS_USAGE_EVENT,
   OPENAI_USAGE_STATUS_KEY,
   OPENROUTER_USAGE_STATUS_KEY,
+  RADIUS_USAGE_STATUS_KEY,
 } from "../src/events.ts";
 import extension from "../src/index.ts";
 
@@ -27,10 +29,21 @@ describe("active provider usage", () => {
         { mode: 0o755 },
       );
       vi.stubEnv("PATH", `${directory}:${process.env.PATH ?? ""}`);
-      const fetch = vi.fn(
-        async (_input: RequestInfo | URL, _init?: RequestInit) =>
-          new Response(JSON.stringify({ data: { usage_monthly: 25.5 } }), { status: 200 }),
-      );
+      const radiusToken = `piga.${Buffer.from('{"alg":"HS256"}').toString("base64url")}.${Buffer.from('{"account_id":"org_active_test"}').toString("base64url")}.sig`;
+      const fetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/billing"))
+          return new Response(
+            JSON.stringify({
+              balance: { credit_balance: 9.24, reserved: 0, available: 7.54 },
+              current_period: { ends_at: "2026-12-01T00:00:00.000Z", actual_charged: 0.76 },
+            }),
+            { status: 200 },
+          );
+        if (url.endsWith("/budgets/usage"))
+          return new Response(JSON.stringify({ overview: { budgets: [] } }), { status: 200 });
+        return new Response(JSON.stringify({ data: { usage_monthly: 25.5 } }), { status: 200 });
+      });
       vi.stubGlobal("fetch", fetch);
 
       const copilotModel = {
@@ -49,6 +62,12 @@ describe("active provider usage", () => {
         id: "openai/gpt-4.1",
         provider: "openrouter",
         baseUrl: "https://openrouter.ai/api/v1",
+        reasoning: true,
+      };
+      const radiusModel = {
+        id: "kimi-k3",
+        provider: "radius",
+        baseUrl: "https://radius.pi.dev/v1",
         reasoning: true,
       };
       let openaiOAuth = true;
@@ -82,8 +101,13 @@ describe("active provider usage", () => {
         modelRegistry: {
           hasConfiguredAuth: () => true,
           isUsingOAuth: (model: { provider: string }) =>
-            model.provider === "openrouter" || (model.provider === "openai" && openaiOAuth),
-          getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test-openrouter-key" }),
+            model.provider === "openrouter" ||
+            model.provider === "radius" ||
+            (model.provider === "openai" && openaiOAuth),
+          getApiKeyAndHeaders: async (model: { provider: string }) =>
+            model.provider === "radius"
+              ? { ok: true, apiKey: radiusToken }
+              : { ok: true, apiKey: "test-openrouter-key" },
         },
       } as unknown as ExtensionContext;
       const dispatch = (name: string, event: unknown = {}) => {
@@ -119,9 +143,17 @@ describe("active provider usage", () => {
       await commands.get("usage")?.handler("", ctx);
       expect(emit).toHaveBeenNthCalledWith(2, OPEN_OPENROUTER_USAGE_EVENT, undefined);
 
+      (ctx as unknown as { model: typeof radiusModel }).model = radiusModel;
+      dispatch("model_select", { model: radiusModel, previousModel: openrouterModel, source: "set" });
+      await vi.waitFor(() => expect(statuses.get(RADIUS_USAGE_STATUS_KEY)).toBe("Radius $7.54 available"));
+      expect(statuses.has(OPENROUTER_USAGE_STATUS_KEY)).toBe(false);
+      await commands.get("usage")?.handler("", ctx);
+      expect(emit).toHaveBeenNthCalledWith(3, OPEN_RADIUS_USAGE_EVENT, undefined);
+
       for (const handler of handlers.get("session_shutdown") ?? []) handler({}, ctx);
       expect(statuses.has(OPENAI_USAGE_STATUS_KEY)).toBe(false);
       expect(statuses.has(OPENROUTER_USAGE_STATUS_KEY)).toBe(false);
+      expect(statuses.has(RADIUS_USAGE_STATUS_KEY)).toBe(false);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

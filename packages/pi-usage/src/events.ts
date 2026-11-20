@@ -4,3 +4,5 @@ export const OPENAI_USAGE_STATUS_KEY = "pi-usage-openai";
 export const OPEN_OPENAI_USAGE_EVENT = "pi-footer:open-openai-usage";
 export const OPENROUTER_USAGE_STATUS_KEY = "pi-usage-openrouter";
 export const OPEN_OPENROUTER_USAGE_EVENT = "pi-footer:open-openrouter-usage";
+export const RADIUS_USAGE_STATUS_KEY = "pi-usage-radius";
+export const OPEN_RADIUS_USAGE_EVENT = "pi-footer:open-radius-usage";
