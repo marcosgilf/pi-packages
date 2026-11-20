@@ -7,8 +7,10 @@ import {
   OPEN_COPILOT_USAGE_EVENT,
   OPEN_OPENAI_USAGE_EVENT,
   OPEN_OPENROUTER_USAGE_EVENT,
+  OPEN_RADIUS_USAGE_EVENT,
   OPENAI_USAGE_STATUS_KEY,
   OPENROUTER_USAGE_STATUS_KEY,
+  RADIUS_USAGE_STATUS_KEY,
 } from "@marcosgilf/pi-usage/events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
@@ -154,6 +156,15 @@ describe("pi-footer", () => {
     component.handleMouse?.(mouse("click", openRouterUsageX, 1));
     expect(emit).toHaveBeenNthCalledWith(6, OPEN_OPENROUTER_USAGE_EVENT, undefined);
     statuses.delete(OPENROUTER_USAGE_STATUS_KEY);
+    statuses.set(RADIUS_USAGE_STATUS_KEY, "Radius $7.54 available");
+    const radiusLines = component.render(160);
+    const radiusStats = radiusLines[1] ?? "";
+    expect(radiusStats).toContain("Radius $7.54 available");
+    expect(radiusLines.join("\n").match(/Radius \$7\.54/g)).toHaveLength(1);
+    const radiusUsageX = visibleWidth(radiusStats.slice(0, radiusStats.indexOf("Radius $7.54")));
+    component.handleMouse?.(mouse("click", radiusUsageX, 1));
+    expect(emit).toHaveBeenNthCalledWith(7, OPEN_RADIUS_USAGE_EVENT, undefined);
+    statuses.delete(RADIUS_USAGE_STATUS_KEY);
     if (openAiStatus) statuses.set(OPENAI_USAGE_STATUS_KEY, openAiStatus);
     vi.stubEnv("OPENAI_ADMIN_KEY", "");
     const localStatusStats = component.render(160)[1] ?? "";
